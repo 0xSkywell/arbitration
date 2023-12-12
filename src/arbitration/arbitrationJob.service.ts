@@ -4,6 +4,7 @@ import { Mutex } from 'async-mutex';
 import { ArbitrationService } from './arbitration.service';
 import { ArbitrationDB, ArbitrationTransaction } from './arbitration.interface';
 import { HTTPGet, HTTPPost } from '../utils';
+
 const mutex = new Mutex();
 let startTime = new Date().valueOf();
 
@@ -37,30 +38,33 @@ export class ArbitrationJobService {
     })
     getListOfUnrefundedTransactions() {
         if (process.env['MakerList']) {
-            return
+            return;
         }
-        console.log("exec userArbitrationJob")
-        this.logger.debug('Called when the current second is 45');
+        console.log('exec userArbitrationJob');
         if (mutex.isLocked()) {
             return;
         }
         mutex
             .runExclusive(async () => {
-                const endTime = new Date().valueOf();
-                const res: any = await HTTPGet(`${process.env['ArbitrationHost']}/transaction/unreimbursedTransactions?startTime=${startTime - 1000 * 5}&endTime=${endTime}`);
-                if (res?.data) {
-                    const list = res.data;
-                    for (const item of list) {
-                        const result = await this.arbitrationService.verifyArbitrationConditions(item as ArbitrationTransaction);
-                        if (result) {
-                            const data = await this.arbitrationService.jsondb.getData(`/arbitrationHash/${item.fromHash.toLowerCase()}`);
-                            if (data) {
-                                continue;
+                try {
+                    const endTime = new Date().valueOf();
+                    const res: any = await HTTPGet(`${process.env['ArbitrationHost']}/transaction/unreimbursedTransactions?startTime=${startTime - 1000 * 5}&endTime=${endTime}`);
+                    if (res?.data) {
+                        const list = res.data;
+                        for (const item of list) {
+                            const result = await this.arbitrationService.verifyArbitrationConditions(item as ArbitrationTransaction);
+                            if (result) {
+                                const data = await this.arbitrationService.jsondb.getData(`/arbitrationHash/${item.fromHash.toLowerCase()}`);
+                                if (data) {
+                                    continue;
+                                }
+                                this.arbitrationService.handleUserArbitrationCreatedEvent(item);
                             }
-                            this.arbitrationService.handleUserArbitrationCreatedEvent(item);
                         }
+                        startTime = endTime;
                     }
-                    startTime = endTime;
+                } catch (e) {
+                    console.error('userArbitrationJob error', e.message);
                 }
             });
     }
@@ -116,7 +120,7 @@ export class ArbitrationJobService {
                         await HTTPPost(`${process.env['ArbitrationHost']}/proof/needProofSubmission`, {
                             isSource: 0,
                             chainId: item.targetChain,
-                            hash: item.hash
+                            hash: item.hash,
                         });
                     }
                 }
