@@ -1,0 +1,22 @@
+version: '3.8'
+networks:
+  app-network:
+    driver: bridge
+services:
+  arbitration-client:
+    build: .
+    container_name: arbitration-client
+    restart: always
+    environment:
+      NODE_ENV: 'development'
+      ArbitrationRPC: '${ArbitrationRPC}'
+      SubgraphEndpoint: '${SubgraphEndpoint}'
+      ArbitrationHost: '${ArbitrationHost}'
+      ArbitrationPrivateKey: '${ArbitrationPrivateKey}'
+      MakerList: '${makerList}'
+    ports:
+      - '3000:3000'
+    networks:
+      - app-network
+    volumes:
+      - './runtime:/app/runtime'
