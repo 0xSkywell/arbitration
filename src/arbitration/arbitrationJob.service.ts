@@ -5,7 +5,6 @@ import { ArbitrationService } from './arbitration.service';
 import { ArbitrationDB, ArbitrationTransaction } from './arbitration.interface';
 import { HTTPGet, HTTPPost } from '../utils';
 const mutex = new Mutex();
-const arbitrationHost = process.env['ArbitrationHost'];
 let startTime = new Date().valueOf();
 
 // arbitration-client
@@ -16,18 +15,13 @@ export class ArbitrationJobService {
     constructor(private arbitrationService: ArbitrationService) {
     }
 
-    @Interval(3000)
-    test(){
-        console.log('test ====')
-    }
-
     @Interval(1000 * 60)
     async syncProof() {
         const isMaker = !!process.env['MakerList'];
         const arbitrationObj = await this.arbitrationService.jsondb.getData(`/arbitrationHash`);
         for (const hash in arbitrationObj) {
             if (arbitrationObj[hash] && arbitrationObj[hash].status) continue;
-            const result = await HTTPGet(`${arbitrationHost}/proof/hash/${hash}`);
+            const result = await HTTPGet(`${process.env['ArbitrationHost']}/proof/hash/${hash}`);
             console.log(result.data, '=== syncProof result');
             const proof: string = result.data;
             if (isMaker) {
@@ -52,14 +46,11 @@ export class ArbitrationJobService {
         }
         mutex
             .runExclusive(async () => {
-                console.log('step 1')
                 const endTime = new Date().valueOf();
-                const res: any = await HTTPGet(`${arbitrationHost}/transaction/unreimbursedTransactions?startTime=${startTime - 1000 * 5}&endTime=${endTime}`);
-                console.log('step 2')
-                if (res?.result) {
-                    const result = res?.result;
-                    console.log('step 3', result.list.length);
-                    for (const item of result.list) {
+                const res: any = await HTTPGet(`${process.env['ArbitrationHost']}/transaction/unreimbursedTransactions?startTime=${startTime - 1000 * 5}&endTime=${endTime}`);
+                if (res?.data) {
+                    const list = res.data;
+                    for (const item of list) {
                         const result = await this.arbitrationService.verifyArbitrationConditions(item as ArbitrationTransaction);
                         if (result) {
                             const data = await this.arbitrationService.jsondb.getData(`/arbitrationHash/${item.fromHash.toLowerCase()}`);
@@ -88,7 +79,7 @@ export class ArbitrationJobService {
         }
         mutex
             .runExclusive(async () => {
-                const res: any[] = <any[]>await HTTPGet(`${arbitrationHost}/proof/needResponseTransactionList`);
+                const res: any[] = <any[]>await HTTPGet(`${process.env['ArbitrationHost']}/proof/needResponseTransactionList`);
                 for (const item of res) {
                     if (!makerList.find(maker => maker.toLowerCase() === item.makerAddress.toLowerCase())) {
                         continue;
@@ -122,7 +113,7 @@ export class ArbitrationJobService {
                         };
                         await this.arbitrationService.jsondb.push(`/arbitrationHash/${item.hash.toLowerCase()}`, arbitrationData);
                         this.logger.log(`maker response arbitration ${item.targetChain} ${item.hash}`);
-                        await HTTPPost(`${arbitrationHost}/proof/needProofSubmission`, {
+                        await HTTPPost(`${process.env['ArbitrationHost']}/proof/needProofSubmission`, {
                             isSource: 0,
                             chainId: item.targetChain,
                             hash: item.hash
