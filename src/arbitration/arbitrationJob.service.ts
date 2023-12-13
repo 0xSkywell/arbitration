@@ -28,7 +28,7 @@ export class ArbitrationJobService {
             const proofData: any = result?.data;
             if (proofData) {
                 if (!proofData.status) {
-                    this.logger.error(`async proof message: ${proofData.message}`);
+                    this.logger.error(`async proof: ${JSON.stringify(proofData)}`);
                 }
                 if(!proofData?.proof){
                     continue;
