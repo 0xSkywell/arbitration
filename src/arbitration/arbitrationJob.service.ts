@@ -57,12 +57,12 @@ export class ArbitrationJobService {
                     const res: any = await HTTPGet(`${process.env['ArbitrationHost']}/transaction/unreimbursedTransactions?startTime=${startTime - 1000 * 60 * 60 * 24}&endTime=${endTime}`);
                     if (res?.data) {
                         const list: ArbitrationTransaction[] = res.data;
-                        console.log('list', list.length);
                         for (const item of list) {
                             const result = await this.arbitrationService.verifyArbitrationConditions(item);
                             if (result) {
                                 const data = await this.arbitrationService.getJSONDBData(`/arbitrationHash/${item.sourceTxHash.toLowerCase()}`);
                                 if (data) {
+                                    console.log('tx exist', item.sourceTxHash.toLowerCase());
                                     continue;
                                 }
                                 await this.arbitrationService.jsondb.push(`/arbitrationHash/${item.sourceTxHash.toLowerCase()}`, {});
@@ -106,6 +106,7 @@ export class ArbitrationJobService {
                     if (result) {
                         const data = await this.arbitrationService.getJSONDBData(`/arbitrationHash/${item.hash.toLowerCase()}`);
                         if (data) {
+                            console.log('tx exist', item.hash.toLowerCase());
                             continue;
                         }
                         const arbitrationData: ArbitrationDB = {
