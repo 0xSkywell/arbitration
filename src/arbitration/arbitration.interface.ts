@@ -12,25 +12,29 @@ export interface ArbitrationTransaction {
     spvAddress: string;
 }
 
-export interface ArbitrationDB {
-    makerAddress?: string;
-    challenger?: string;
-    spvAddress?: string;
-    isSource?: number;
-    sourceChain?: number;
-    targetChain?: number;
-    targetTxHash?: string;
-    sourceChainId?: number;
-    sourceTxHash?: string;
-    proof?: string;
-    mdcAddress: string;
-    status: number;
-    targetNonce?: string; // TODO
-    targetFrom?: string; // TODO
-    targetToken?: string; // TODO
-    targetAmount?: string; // TODO
-    responseMakersHash?: string; // TODO
-    responseTime?: string; // TODO
-    rawDatas?: string; // TODO
-    rlpRuleBytes?: string; // TODO
+export interface VerifyChallengeSourceParams {
+    hash: string;
+    sourceMaker: string;
+    spvAddress: string;
+    sourceChain: string;
+    proof: string;
+    rawDatas: string;
+    rlpRuleBytes: string;
+}
+
+export interface VerifyChallengeDestParams {
+    sourceMaker: string;
+    targetNonce: string;
+    targetChain: string;
+    targetAddress: string;
+    targetToken: string;
+    targetAmount: string;
+    responseMakersHash: string;
+    responseTime: string;
+    challenger: string;
+    spvAddress: string;
+    sourceChain: string;
+    sourceId: string;
+    proof: string;
+    rawDatas: string;
 }

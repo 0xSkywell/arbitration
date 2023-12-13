@@ -23,20 +23,21 @@ export class ArbitrationJobService {
         const arbitrationObj = await this.arbitrationService.getJSONDBData(`/arbitrationHash`);
         for (const hash in arbitrationObj) {
             if (arbitrationObj[hash] && arbitrationObj[hash].status) continue;
-            const result: any = await HTTPGet(`${process.env['ArbitrationHost']}/proof/hash/${hash}`);
-            console.log(result, '=== syncProof result', `${process.env['ArbitrationHost']}/proof/hash/${hash}`);
+            const url = `${process.env['ArbitrationHost']}/proof/${isMaker ? 'targetId' : 'sourceId'}/${hash}`;
+            const result: any = await HTTPGet(url);
+            console.log(result, '=== syncProof result', url);
             const proofData: any = result?.data;
             if (proofData) {
                 if (!proofData.status) {
                     this.logger.error(`async proof: ${JSON.stringify(proofData)}`);
                 }
-                if(!proofData?.proof){
+                if (!proofData?.proof) {
                     continue;
                 }
                 if (isMaker) {
-                    await this.arbitrationService.makerSubmitProof(arbitrationObj[hash], proofData.proof);
+                    await this.arbitrationService.makerSubmitProof(proofData);
                 } else {
-                    await this.arbitrationService.userSubmitProof(arbitrationObj[hash], proofData.proof);
+                    await this.arbitrationService.userSubmitProof(proofData);
                 }
             }
         }
@@ -72,7 +73,7 @@ export class ArbitrationJobService {
                                 try {
                                     await this.arbitrationService.handleUserArbitration(item);
                                 } catch (error) {
-                                    console.error('error',error)
+                                    console.error('error', error);
                                     this.logger.error('Arbitration encountered an exception', error);
                                 }
 
@@ -100,7 +101,8 @@ export class ArbitrationJobService {
         }
         mutex
             .runExclusive(async () => {
-                const res: any[] = <any[]>await HTTPGet(`${process.env['ArbitrationHost']}/proof/needResponseTransactionList`);
+                const account = await this.arbitrationService.getWallet();
+                const res: any[] = <any[]>await HTTPGet(`${process.env['ArbitrationHost']}/proof/makerNeedResponseTxList?makerAddress=${account.address.toLowerCase()}`);
                 for (const item of res) {
                     if (!makerList.find(maker => maker.toLowerCase() === item.makerAddress.toLowerCase())) {
                         continue;
@@ -135,7 +137,7 @@ export class ArbitrationJobService {
                         };
                         await this.arbitrationService.jsondb.push(`/arbitrationHash/${item.hash.toLowerCase()}`, arbitrationData);
                         this.logger.log(`maker response arbitration ${item.targetChain} ${item.hash}`);
-                        await HTTPPost(`${process.env['ArbitrationHost']}/proof/needProofSubmission`, {
+                        await HTTPPost(`${process.env['ArbitrationHost']}/proof/makerAskProof`, {
                             isSource: 0,
                             chainId: item.targetChain,
                             hash: item.hash,

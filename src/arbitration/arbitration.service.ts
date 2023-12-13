@@ -3,7 +3,12 @@ import { SchedulerRegistry } from '@nestjs/schedule';
 import { JsonDB, Config } from 'node-json-db';
 import { utils, providers, ethers } from 'ethers';
 import MDCAbi from '../abi/MDC.abi.json';
-import { ArbitrationDB, ArbitrationTransaction } from './arbitration.interface';
+import {
+    ArbitrationDB,
+    ArbitrationTransaction,
+    VerifyChallengeDestParams,
+    VerifyChallengeSourceParams,
+} from './arbitration.interface';
 import { HTTPPost, querySubgraph } from '../utils';
 import Keyv from 'keyv';
 const keyv = new Keyv();
@@ -202,14 +207,11 @@ export class ArbitrationService {
         this.logger.log(`handleUserArbitration tx: ${JSON.stringify(response)}`);
         await this.jsondb.push(`/arbitrationHash/${tx.sourceTxHash.toLowerCase()}`, {
             fromChainId: tx.sourceChainId,
-            sourceTxHash: tx.sourceTxHash.toLowerCase(),
             submitSourceTxHash: response.hash,
-            mdcAddress,
-            spvAddress: tx.spvAddress,
             status: 0,
         });
         this.logger.log(`handleUserArbitration success ${tx.sourceTxHash} ${response.hash}`);
-        const res = await HTTPPost(`${process.env['ArbitrationHost']}/proof/needProofSubmission`, {
+        const res = await HTTPPost(`${process.env['ArbitrationHost']}/proof/userAskProof`, {
             isSource: 1,
             chainId: tx.sourceChainId,
             hash: tx.sourceTxHash,
@@ -217,7 +219,7 @@ export class ArbitrationService {
             challenger: account.address,
             spvAddress: tx.spvAddress,
         });
-        this.logger.log(`needProofSubmission ${JSON.stringify(res)}`);
+        this.logger.log(`userAskProof ${JSON.stringify(res)}`);
         // return response as any;
     }
 
@@ -238,29 +240,30 @@ export class ArbitrationService {
         return new ethers.Wallet(arbitrationPrivateKey).connect(provider);
     }
 
-    async userSubmitProof(txData: ArbitrationDB, proof: string) {
-        if (!proof) {
+    async userSubmitProof(txData: VerifyChallengeSourceParams) {
+        if (!txData.proof) {
             throw new Error(`proof is empty`);
         }
         const wallet = await this.getWallet();
+        const mdcAddress = await this.getMDCAddress(txData.sourceMaker);
         const ifa = new ethers.utils.Interface(MDCAbi);
         const data = ifa.encodeFunctionData('verifyChallengeSource', [
-            txData.challenger,
+            wallet.address,
             txData.spvAddress,
-            txData.sourceChainId,
-            proof,
+            +txData.sourceChain,
+            txData.proof,
             txData.rawDatas,
             txData.rlpRuleBytes,
         ]);
         const transactionRequest = {
             data,
-            to: txData.mdcAddress,
+            to: mdcAddress,
             value: 0n,
             from: wallet.address,
         };
         const response: any = await wallet.populateTransaction(transactionRequest);
         this.logger.log(`submitProof tx: ${response}`);
-        await this.jsondb.push(`/arbitrationHash/${txData.sourceTxHash}`, {
+        await this.jsondb.push(`/arbitrationHash/${txData.hash}`, {
             ...txData,
             submitSourceProofHash: response.transactionHash,
             status: 1,
@@ -268,15 +271,16 @@ export class ArbitrationService {
         return response as any;
     }
 
-    async makerSubmitProof(txData: ArbitrationDB, proof: string) {
-        if (!proof) {
+    async makerSubmitProof(txData: VerifyChallengeDestParams) {
+        if (!txData.proof) {
             throw new Error(`proof is empty`);
         }
         const wallet = await this.getWallet();
         const ifa = new ethers.utils.Interface(MDCAbi);
 
         const chainRels = await this.getChainRels();
-        const chain = chainRels.find(c => +c.id === +txData.sourceChainId);
+        const mdcAddress = await this.getMDCAddress(txData.sourceMaker);
+        const chain = chainRels.find(c => +c.id === +txData.sourceChain);
         if (!chain) {
             throw new Error('ChainRels not found');
         }
@@ -285,7 +289,7 @@ export class ArbitrationService {
             +chain.maxVerifyChallengeSourceTxSecond,
             +txData.targetNonce,
             +txData.targetChain,
-            +txData.targetFrom,
+            +txData.targetAddress,
             +txData.targetToken,
             +txData.targetAmount,
             +txData.responseMakersHash,
@@ -294,21 +298,21 @@ export class ArbitrationService {
         const data = ifa.encodeFunctionData('verifyChallengeDest', [
             txData.challenger,
             txData.spvAddress,
-            txData.sourceChainId,
-            txData.sourceTxHash,
-            proof,
+            txData.sourceChain,
+            txData.sourceId,
+            txData.proof,
             verifiedSourceTxData,
             txData.rawDatas,
         ]);
         const transactionRequest = {
             data,
-            to: txData.mdcAddress,
+            to: mdcAddress,
             value: "0x",
             from: wallet.address,
         };
         const response: any = await wallet.populateTransaction(transactionRequest);
         this.logger.log('===submitProof tx', response);
-        await this.jsondb.push(`/arbitrationHash/${txData.sourceTxHash}`, {
+        await this.jsondb.push(`/arbitrationHash/${txData.sourceId}`, {
             ...txData,
             submitSourceProofHash: response.transactionHash,
             status: 1,
