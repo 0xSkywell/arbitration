@@ -30,6 +30,9 @@ export class ArbitrationJobService {
                 if (!proofData.status) {
                     this.logger.error(`async proof message: ${proofData.message}`);
                 }
+                if(!proofData?.proof){
+                    continue;
+                }
                 if (isMaker) {
                     await this.arbitrationService.makerSubmitProof(arbitrationObj[hash], proofData.proof);
                 } else {
