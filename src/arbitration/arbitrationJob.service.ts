@@ -19,7 +19,7 @@ export class ArbitrationJobService {
     @Interval(1000 * 60)
     async syncProof() {
         const isMaker = !!process.env['MakerList'];
-        const arbitrationObj = await this.arbitrationService.jsondb.getData(`/arbitrationHash`);
+        const arbitrationObj = await this.arbitrationService.getJSONDBData(`/arbitrationHash`);
         for (const hash in arbitrationObj) {
             if (arbitrationObj[hash] && arbitrationObj[hash].status) continue;
             const result = await HTTPGet(`${process.env['ArbitrationHost']}/proof/hash/${hash}`);
@@ -48,21 +48,23 @@ export class ArbitrationJobService {
             .runExclusive(async () => {
                 try {
                     const endTime = new Date().valueOf();
-                    const res: any = await HTTPGet(`${process.env['ArbitrationHost']}/transaction/unreimbursedTransactions?startTime=${startTime - 1000 * 60 * 60}&endTime=${endTime}`);
+                    const res: any = await HTTPGet(`${process.env['ArbitrationHost']}/transaction/unreimbursedTransactions?startTime=${startTime - 1000 * 60 * 60 * 24}&endTime=${endTime}`);
                     if (res?.data) {
-                        const list = res.data;
+                        const list: ArbitrationTransaction[] = res.data;
                         console.log('list', list.length);
                         for (const item of list) {
-                            const result = await this.arbitrationService.verifyArbitrationConditions(item as ArbitrationTransaction);
+                            const result = await this.arbitrationService.verifyArbitrationConditions(item);
+                            console.log('result', result);
                             if (result) {
-                                const data = await this.arbitrationService.jsondb.getData(`/arbitrationHash/${item.fromHash.toLowerCase()}`);
+                                const data = await this.arbitrationService.getJSONDBData(`/arbitrationHash/${item.sourceTxHash.toLowerCase()}`);
                                 if (data) {
                                     continue;
                                 }
                                 await this.arbitrationService.jsondb.push(`/arbitrationHash/${item.sourceTxHash.toLowerCase()}`, {});
                                 try {
-                                    this.arbitrationService.handleUserArbitration(item);
+                                    await this.arbitrationService.handleUserArbitration(item);
                                 } catch (error) {
+                                    console.error('error',error)
                                     this.logger.error('Arbitration encountered an exception', error);
                                 }
 
@@ -97,7 +99,7 @@ export class ArbitrationJobService {
                     }
                     const result = this.arbitrationService.verifyArbitrationConditions(item as ArbitrationTransaction);
                     if (result) {
-                        const data = await this.arbitrationService.jsondb.getData(`/arbitrationHash/${item.hash.toLowerCase()}`);
+                        const data = await this.arbitrationService.getJSONDBData(`/arbitrationHash/${item.hash.toLowerCase()}`);
                         if (data) {
                             continue;
                         }

@@ -1,4 +1,3 @@
-import { BigNumber } from 'bignumber.js';
 import { Injectable, Logger } from '@nestjs/common';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { JsonDB, Config } from 'node-json-db';
@@ -6,6 +5,7 @@ import {
     ethers,
     Interface,
 } from 'ethers6';
+import { utils, providers } from 'ethers';
 import MDCAbi from '../abi/MDC.abi.json';
 import { ArbitrationDB, ArbitrationTransaction } from './arbitration.interface';
 import { HTTPPost, querySubgraph } from '../utils';
@@ -61,7 +61,8 @@ export class ArbitrationService {
     }
           `;
         const result = await querySubgraph(queryStr);
-        return result['mdcs'][0];
+        console.log('getMDCAddress', result?.data?.mdcs?.[0]?.id);
+        return result?.data?.mdcs?.[0]?.id;
     }
 
     async getChainRels():Promise<ChainRel[]> {
@@ -86,10 +87,56 @@ export class ArbitrationService {
       }
           `;
             const result = await querySubgraph(queryStr) || {};
-            chainRels = result['chainRels'] || [];
+            chainRels = result?.data?.chainRels || [];
             await keyv.set('ChainRels', chainRels, 1000 * 5);
         }
         return chainRels;
+    }
+
+    async getJSONDBData(dataPath) {
+        try {
+            return await this.jsondb.getData(dataPath);
+        } catch (e) {
+            return null;
+        }
+    }
+
+    async getGasPrice(transactionRequest: any) {
+        const arbitrationRPC = process.env['ArbitrationRPC'];
+        const provider = new providers.JsonRpcProvider({
+            url: arbitrationRPC,
+        });
+        try {
+            transactionRequest.gasLimit = transactionRequest.data ? await provider.estimateGas({
+                from: transactionRequest.from,
+                to: transactionRequest.to,
+                value: transactionRequest.value,
+                data: transactionRequest.data,
+            }) : await provider.estimateGas({
+                from: transactionRequest.from,
+                to: transactionRequest.to,
+                value: transactionRequest.value,
+            });
+        } catch (e) {
+            this.logger.error(`transfer estimateGas error`, e);
+        }
+
+
+        try {
+            const feeData = await provider.getFeeData();
+            if (feeData.maxFeePerGas && feeData.maxPriorityFeePerGas) {
+                transactionRequest.type = 2;
+                transactionRequest.maxFeePerGas = feeData.maxFeePerGas;
+                transactionRequest.maxPriorityFeePerGas = feeData.maxPriorityFeePerGas;
+                delete transactionRequest.gasPrice;
+                this.logger.log(`EIP1559 use maxFeePerGas: ${transactionRequest.maxFeePerGas.toString()}, maxPriorityFeePerGas: ${transactionRequest.maxPriorityFeePerGas.toString()}, gasLimit: ${transactionRequest.gasLimit.toString()}`);
+            } else {
+                transactionRequest.gasPrice = feeData.gasPrice;
+                this.logger.log(`Legacy use gasPrice: ${transactionRequest.gasPrice.toString()}, gasLimit: ${transactionRequest.gasLimit.toString()}`);
+            }
+        } catch (e) {
+            this.logger.error('get gas price error:', e);
+        }
     }
 
     async handleUserArbitration(tx: ArbitrationTransaction) {
@@ -123,35 +170,50 @@ export class ArbitrationService {
         const mdcAddress = await this.getMDCAddress(tx.sourceMaker);
         // Obtaining arbitration deposit
         // TODO: Verify Balance
-        const data = ifa.encodeFunctionData('challenge', [
-            tx.sourceTxTime,
-            tx.sourceChainId,
-            tx.sourceTxBlockNum,
-            tx.sourceTxIndex,
+        const encodeData = [
+            +tx.sourceTxTime,
+            +tx.sourceChainId,
+            +tx.sourceTxBlockNum,
+            +tx.sourceTxIndex,
             tx.sourceTxHash,
             tx.ruleKey,
             tx.freezeToken,
-            new BigNumber(tx.freezeAmount1),
-            tx.parentNodeNumOfTargetNode || 0,
-        ]);
+            +tx.freezeAmount1,
+            +tx.parentNodeNumOfTargetNode || 0,
+        ];
+        console.log('encodeData', encodeData);
+        const data = ifa.encodeFunctionData('challenge', encodeData);
+
+        const arbitrationRPC = process.env['ArbitrationRPC'];
+        const provider = new providers.JsonRpcProvider({
+            url: arbitrationRPC,
+        });
 
         const transactionRequest = {
             data,
             to: mdcAddress,
-            value: '0x',
+            value: 0n,
             from: account.address,
         };
-        const response: any = await account.populateTransaction(transactionRequest);
+        console.log('transactionRequest', transactionRequest);
+        await this.getGasPrice(transactionRequest);
+
+        const signedTx = await account.signTransaction(transactionRequest);
+        const txHash = utils.keccak256(signedTx);
+        this.logger.log(`txHash: ${txHash}`);
+        const response = await provider.sendTransaction(signedTx);
+        // const response: any = await account.populateTransaction(transactionRequest);
+         // broadcastTransaction  sendTransaction
         console.log(response, '===tx', transactionRequest);
         await this.jsondb.push(`/arbitrationHash/${tx.sourceTxHash.toLowerCase()}`, {
             fromChainId: tx.sourceChainId,
             sourceTxHash: tx.sourceTxHash.toLowerCase(),
-            submitSourceTxHash: response.transactionHash,
+            submitSourceTxHash: response.hash,
             mdcAddress,
             spvAddress: tx.spvAddress,
             status: 0,
         });
-        this.logger.log(`handleUserArbitration success ${tx.sourceTxHash} ${response.transactionHash}`);
+        this.logger.log(`handleUserArbitration success ${tx.sourceTxHash} ${response.hash}`);
         await HTTPPost(`${arbitrationHost}/proof/needProofSubmission`, {
             isSource: 1,
             chainId: tx.sourceChainId,
@@ -192,7 +254,7 @@ export class ArbitrationService {
         const transactionRequest = {
             data,
             to: txData.mdcAddress,
-            value: '0x',
+            value: 0n,
             from: wallet.address,
         };
         const response: any = await wallet.populateTransaction(transactionRequest);
