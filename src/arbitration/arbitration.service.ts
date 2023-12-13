@@ -1,11 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { JsonDB, Config } from 'node-json-db';
-import {
-    ethers,
-    Interface,
-} from 'ethers6';
-import { utils, providers } from 'ethers';
+import { utils, providers, ethers } from 'ethers';
 import MDCAbi from '../abi/MDC.abi.json';
 import { ArbitrationDB, ArbitrationTransaction } from './arbitration.interface';
 import { HTTPPost, querySubgraph } from '../utils';
@@ -26,8 +22,6 @@ export interface ChainRel {
     latestUpdateTimestamp: string;
     spvs: string[];
 }
-
-const arbitrationHost = process.env['ArbitrationHost'];
 
 @Injectable()
 export class ArbitrationService {
@@ -106,20 +100,21 @@ export class ArbitrationService {
         const provider = new providers.JsonRpcProvider({
             url: arbitrationRPC,
         });
-        try {
-            transactionRequest.gasLimit = transactionRequest.data ? await provider.estimateGas({
-                from: transactionRequest.from,
-                to: transactionRequest.to,
-                value: transactionRequest.value,
-                data: transactionRequest.data,
-            }) : await provider.estimateGas({
-                from: transactionRequest.from,
-                to: transactionRequest.to,
-                value: transactionRequest.value,
-            });
-        } catch (e) {
-            this.logger.error(`transfer estimateGas error`, e);
-        }
+        transactionRequest.gasLimit = ethers.BigNumber.from(210000);
+        // try {
+        //     transactionRequest.gasLimit = transactionRequest.data ? await provider.estimateGas({
+        //         from: transactionRequest.from,
+        //         to: transactionRequest.to,
+        //         value: transactionRequest.value,
+        //         data: transactionRequest.data,
+        //     }) : await provider.estimateGas({
+        //         from: transactionRequest.from,
+        //         to: transactionRequest.to,
+        //         value: transactionRequest.value,
+        //     });
+        // } catch (e) {
+        //     this.logger.error(`transfer estimateGas error`, e.message);
+        // }
 
 
         try {
@@ -129,10 +124,10 @@ export class ArbitrationService {
                 transactionRequest.maxFeePerGas = feeData.maxFeePerGas;
                 transactionRequest.maxPriorityFeePerGas = feeData.maxPriorityFeePerGas;
                 delete transactionRequest.gasPrice;
-                this.logger.log(`EIP1559 use maxFeePerGas: ${transactionRequest.maxFeePerGas.toString()}, maxPriorityFeePerGas: ${transactionRequest.maxPriorityFeePerGas.toString()}, gasLimit: ${transactionRequest.gasLimit.toString()}`);
+                this.logger.log(`EIP1559 use maxFeePerGas: ${String(transactionRequest.maxFeePerGas)}, maxPriorityFeePerGas: ${String(transactionRequest.maxPriorityFeePerGas)}, gasLimit: ${String(transactionRequest.gasLimit)}`);
             } else {
                 transactionRequest.gasPrice = feeData.gasPrice;
-                this.logger.log(`Legacy use gasPrice: ${transactionRequest.gasPrice.toString()}, gasLimit: ${transactionRequest.gasLimit.toString()}`);
+                this.logger.log(`Legacy use gasPrice: ${String(transactionRequest.gasPrice)}, gasLimit: ${String(transactionRequest.gasLimit)}`);
             }
         } catch (e) {
             this.logger.error('get gas price error:', e);
@@ -141,7 +136,7 @@ export class ArbitrationService {
 
     async handleUserArbitration(tx: ArbitrationTransaction) {
         this.logger.log(`handleUserArbitration begin ${tx.sourceTxHash}`);
-        const ifa = new Interface(MDCAbi);
+        const ifa = new ethers.utils.Interface(MDCAbi);
         if (!tx.sourceTxTime) {
             throw new Error('sourceTxTime not found');
         }
@@ -188,23 +183,23 @@ export class ArbitrationService {
         const provider = new providers.JsonRpcProvider({
             url: arbitrationRPC,
         });
-
+        const chainId = await account.getChainId();
         const transactionRequest = {
+            chainId,
             data,
             to: mdcAddress,
             value: 0n,
             from: account.address,
+            nonce: await account.getTransactionCount('pending'),
         };
-        console.log('transactionRequest', transactionRequest);
         await this.getGasPrice(transactionRequest);
+        console.log('transactionRequest', transactionRequest);
 
         const signedTx = await account.signTransaction(transactionRequest);
         const txHash = utils.keccak256(signedTx);
         this.logger.log(`txHash: ${txHash}`);
         const response = await provider.sendTransaction(signedTx);
-        // const response: any = await account.populateTransaction(transactionRequest);
-         // broadcastTransaction  sendTransaction
-        console.log(response, '===tx', transactionRequest);
+        this.logger.log(`handleUserArbitration tx: ${JSON.stringify(response)}`);
         await this.jsondb.push(`/arbitrationHash/${tx.sourceTxHash.toLowerCase()}`, {
             fromChainId: tx.sourceChainId,
             sourceTxHash: tx.sourceTxHash.toLowerCase(),
@@ -214,13 +209,16 @@ export class ArbitrationService {
             status: 0,
         });
         this.logger.log(`handleUserArbitration success ${tx.sourceTxHash} ${response.hash}`);
-        await HTTPPost(`${arbitrationHost}/proof/needProofSubmission`, {
+        const res = await HTTPPost(`${process.env['ArbitrationHost']}/proof/needProofSubmission`, {
             isSource: 1,
             chainId: tx.sourceChainId,
             hash: tx.sourceTxHash,
             mdcAddress,
+            challenger: account.address,
+            spvAddress: tx.spvAddress,
         });
-        return response as any;
+        this.logger.log(`needProofSubmission ${JSON.stringify(res)}`);
+        // return response as any;
     }
 
     async getWallet() {
@@ -233,7 +231,10 @@ export class ArbitrationService {
         if (!arbitrationRPC) {
             throw new Error(`${chainId} arbitrationRPC not config`);
         }
-        const provider = new ethers.JsonRpcProvider(arbitrationRPC);
+        const provider = new providers.JsonRpcProvider({
+            url: arbitrationRPC,
+        });
+        // const provider = new ethers.JsonRpcProvider(arbitrationRPC);
         return new ethers.Wallet(arbitrationPrivateKey).connect(provider);
     }
 
@@ -242,7 +243,7 @@ export class ArbitrationService {
             throw new Error(`proof is empty`);
         }
         const wallet = await this.getWallet();
-        const ifa = new Interface(MDCAbi);
+        const ifa = new ethers.utils.Interface(MDCAbi);
         const data = ifa.encodeFunctionData('verifyChallengeSource', [
             txData.challenger,
             txData.spvAddress,
@@ -258,7 +259,7 @@ export class ArbitrationService {
             from: wallet.address,
         };
         const response: any = await wallet.populateTransaction(transactionRequest);
-        console.log(response, '===submitProof tx', transactionRequest);
+        this.logger.log(`submitProof tx: ${response}`);
         await this.jsondb.push(`/arbitrationHash/${txData.sourceTxHash}`, {
             ...txData,
             submitSourceProofHash: response.transactionHash,
@@ -272,7 +273,7 @@ export class ArbitrationService {
             throw new Error(`proof is empty`);
         }
         const wallet = await this.getWallet();
-        const ifa = new Interface(MDCAbi);
+        const ifa = new ethers.utils.Interface(MDCAbi);
 
         const chainRels = await this.getChainRels();
         const chain = chainRels.find(c => +c.id === +txData.sourceChainId);
@@ -306,7 +307,7 @@ export class ArbitrationService {
             from: wallet.address,
         };
         const response: any = await wallet.populateTransaction(transactionRequest);
-        console.log(response, '===submitProof tx', transactionRequest);
+        this.logger.log('===submitProof tx', response);
         await this.jsondb.push(`/arbitrationHash/${txData.sourceTxHash}`, {
             ...txData,
             submitSourceProofHash: response.transactionHash,

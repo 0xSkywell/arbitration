@@ -19,16 +19,22 @@ export class ArbitrationJobService {
     @Interval(1000 * 60)
     async syncProof() {
         const isMaker = !!process.env['MakerList'];
+        console.log('syncProof ====', isMaker);
         const arbitrationObj = await this.arbitrationService.getJSONDBData(`/arbitrationHash`);
         for (const hash in arbitrationObj) {
             if (arbitrationObj[hash] && arbitrationObj[hash].status) continue;
-            const result = await HTTPGet(`${process.env['ArbitrationHost']}/proof/hash/${hash}`);
-            console.log(result.data, '=== syncProof result');
-            const proof: string = result.data;
-            if (isMaker) {
-                await this.arbitrationService.makerSubmitProof(arbitrationObj[hash], proof);
-            } else {
-                await this.arbitrationService.userSubmitProof(arbitrationObj[hash], proof);
+            const result: any = await HTTPGet(`${process.env['ArbitrationHost']}/proof/hash/${hash}`);
+            console.log(result, '=== syncProof result', `${process.env['ArbitrationHost']}/proof/hash/${hash}`);
+            const proofData: any = result?.data;
+            if (proofData) {
+                if (!proofData.status) {
+                    this.logger.error(`async proof message: ${proofData.message}`);
+                }
+                if (isMaker) {
+                    await this.arbitrationService.makerSubmitProof(arbitrationObj[hash], proofData.proof);
+                } else {
+                    await this.arbitrationService.userSubmitProof(arbitrationObj[hash], proofData.proof);
+                }
             }
         }
     }
@@ -54,7 +60,6 @@ export class ArbitrationJobService {
                         console.log('list', list.length);
                         for (const item of list) {
                             const result = await this.arbitrationService.verifyArbitrationConditions(item);
-                            console.log('result', result);
                             if (result) {
                                 const data = await this.arbitrationService.getJSONDBData(`/arbitrationHash/${item.sourceTxHash.toLowerCase()}`);
                                 if (data) {
