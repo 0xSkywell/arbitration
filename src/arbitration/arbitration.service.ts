@@ -92,7 +92,8 @@ export class ArbitrationService {
         return chainRels;
     }
 
-    async initiateArbitration(account: ethers.Wallet, tx: ArbitrationTransaction) {
+    async handleUserArbitration(tx: ArbitrationTransaction) {
+        this.logger.log(`handleUserArbitration begin ${tx.sourceTxHash}`);
         const ifa = new Interface(MDCAbi);
         if (!tx.sourceTxTime) {
             throw new Error('sourceTxTime not found');
@@ -118,6 +119,8 @@ export class ArbitrationService {
         if (!tx.freezeAmount1) {
             throw new Error('freezeAmount1 not found');
         }
+        const account = await this.getWallet();
+        const mdcAddress = await this.getMDCAddress(tx.sourceMaker);
         // Obtaining arbitration deposit
         // TODO: Verify Balance
         const data = ifa.encodeFunctionData('challenge', [
@@ -131,7 +134,7 @@ export class ArbitrationService {
             new BigNumber(tx.freezeAmount1),
             tx.parentNodeNumOfTargetNode || 0,
         ]);
-        const mdcAddress = await this.getMDCAddress(tx.sourceMaker);
+
         const transactionRequest = {
             data,
             to: mdcAddress,
@@ -145,9 +148,10 @@ export class ArbitrationService {
             sourceTxHash: tx.sourceTxHash.toLowerCase(),
             submitSourceTxHash: response.transactionHash,
             mdcAddress,
+            spvAddress: tx.spvAddress,
             status: 0,
         });
-        this.logger.log(`initiateArbitration success ${tx.sourceTxHash} ${response.transactionHash}`);
+        this.logger.log(`handleUserArbitration success ${tx.sourceTxHash} ${response.transactionHash}`);
         await HTTPPost(`${arbitrationHost}/proof/needProofSubmission`, {
             isSource: 1,
             chainId: tx.sourceChainId,
@@ -247,26 +251,5 @@ export class ArbitrationService {
             status: 1,
         });
         return response as any;
-    }
-
-    async handleUserArbitrationCreatedEvent(payload: ArbitrationTransaction) {
-        try {
-            const wallet = await this.getWallet();
-            const arbitrationData: ArbitrationDB = {
-                challenger: wallet.address,
-                spvAddress: payload.spvAddress,
-                sourceChainId: payload.sourceChainId,
-                sourceTxHash: payload.sourceTxHash.toLowerCase(),
-                mdcAddress: '',
-                status: 0,
-            };
-            await this.jsondb.push(`/arbitrationHash/${payload.sourceTxHash.toLowerCase()}`, arbitrationData);
-
-            this.logger.log(`initiateArbitration wait initiateArbitration ${payload.sourceTxHash}`);
-            const result = await this.initiateArbitration(wallet, payload);
-            this.logger.log(`initiateArbitration submit success ${result.hash} ${payload.sourceTxHash}`);
-        } catch (error) {
-            this.logger.error('Arbitration encountered an exception', error);
-        }
     }
 }

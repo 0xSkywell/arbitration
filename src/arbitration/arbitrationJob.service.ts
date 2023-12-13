@@ -48,9 +48,10 @@ export class ArbitrationJobService {
             .runExclusive(async () => {
                 try {
                     const endTime = new Date().valueOf();
-                    const res: any = await HTTPGet(`${process.env['ArbitrationHost']}/transaction/unreimbursedTransactions?startTime=${startTime - 1000 * 5}&endTime=${endTime}`);
+                    const res: any = await HTTPGet(`${process.env['ArbitrationHost']}/transaction/unreimbursedTransactions?startTime=${startTime - 1000 * 60 * 60}&endTime=${endTime}`);
                     if (res?.data) {
                         const list = res.data;
+                        console.log('list', list.length);
                         for (const item of list) {
                             const result = await this.arbitrationService.verifyArbitrationConditions(item as ArbitrationTransaction);
                             if (result) {
@@ -58,7 +59,13 @@ export class ArbitrationJobService {
                                 if (data) {
                                     continue;
                                 }
-                                this.arbitrationService.handleUserArbitrationCreatedEvent(item);
+                                await this.arbitrationService.jsondb.push(`/arbitrationHash/${item.sourceTxHash.toLowerCase()}`, {});
+                                try {
+                                    this.arbitrationService.handleUserArbitration(item);
+                                } catch (error) {
+                                    this.logger.error('Arbitration encountered an exception', error);
+                                }
+
                             }
                         }
                         startTime = endTime;
