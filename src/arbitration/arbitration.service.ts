@@ -184,7 +184,7 @@ export class ArbitrationService {
             url: process.env['ArbitrationRPC'],
         });
         await this.getGasPrice(transactionRequest);
-        logger.info(`transactionRequest: ${JSON.stringify(transactionRequest)}`);
+        logger.debug(`transactionRequest: ${JSON.stringify(transactionRequest)}`);
         const signedTx = await account.signTransaction(transactionRequest);
         const txHash = utils.keccak256(signedTx);
         logger.info(`txHash: ${txHash}`);
@@ -213,10 +213,10 @@ export class ArbitrationService {
             +tx.freezeAmount1,
             +parentNodeNumOfTargetNode,
         ];
-        // logger.info(`encodeData: ${JSON.stringify(encodeData)}`);
+        logger.debug(`encodeData: ${JSON.stringify(encodeData)}`);
         const data = ifa.encodeFunctionData('challenge', encodeData);
         const response = await this.send(mdcAddress, ethers.BigNumber.from(0), data);
-        logger.info(`handleUserArbitration tx: ${JSON.stringify(response)}`);
+        logger.debug(`handleUserArbitration tx: ${JSON.stringify(response)}`);
         await this.jsondb.push(`/arbitrationHash/${tx.sourceTxHash.toLowerCase()}`, {
             fromChainId: tx.sourceChainId,
             submitSourceTxHash: response.hash,
@@ -238,6 +238,7 @@ export class ArbitrationService {
         if (!txData.proof) {
             throw new Error(`proof is empty`);
         }
+        logger.info(`userSubmitProof begin ${txData.hash}`);
         const wallet = await this.getWallet();
         const mdcAddress = await this.getMDCAddress(txData.sourceMaker);
         const ifa = new ethers.utils.Interface(MDCAbi);
@@ -249,14 +250,15 @@ export class ArbitrationService {
             txData.rawDatas,
             txData.rlpRuleBytes
         ];
-        logger.info(`encodeData: ${JSON.stringify(encodeData)}`);
+        logger.debug(`encodeData: ${JSON.stringify(encodeData)}`);
         const data = ifa.encodeFunctionData('verifyChallengeSource', encodeData);
         const response = await this.send(mdcAddress, ethers.BigNumber.from(0), data);
-        logger.info(`UserSubmitProof tx: ${JSON.stringify(response)}`);
+        logger.debug(`UserSubmitProof tx: ${JSON.stringify(response)}`);
         await this.jsondb.push(`/arbitrationHash/${txData.hash}`, {
-            submitSourceProofHash: response.hash,
+            verifyChallengeSourceHash: response.hash,
             status: 1,
         });
+        logger.info(`userSubmitProof end ${txData.hash} ${response.hash}`);
         return response as any;
     }
 
@@ -264,6 +266,7 @@ export class ArbitrationService {
         if (!txData.proof) {
             throw new Error(`proof is empty`);
         }
+        logger.info(`makerSubmitProof begin sourceId: ${txData.sourceId} responseMakersHash: ${txData.responseMakersHash}`);
         const ifa = new ethers.utils.Interface(MDCAbi);
         const chainRels = await this.getChainRels();
         const mdcAddress = await this.getMDCAddress(txData.sourceMaker);
@@ -282,7 +285,7 @@ export class ArbitrationService {
             +txData.responseMakersHash,
             +txData.responseTime,
         ];
-        const data = ifa.encodeFunctionData('verifyChallengeDest', [
+        const encodeData = [
             txData.challenger,
             txData.spvAddress,
             txData.sourceChain,
@@ -290,14 +293,16 @@ export class ArbitrationService {
             txData.proof,
             verifiedSourceTxData,
             txData.rawDatas,
-        ]);
-        const response = await this.send(mdcAddress,ethers.BigNumber.from(0),data);
-        logger.info(`MakerSubmitProof tx: ${JSON.stringify(response)}`);
+        ];
+        logger.debug(`encodeData: ${JSON.stringify(encodeData)}`);
+        const data = ifa.encodeFunctionData('verifyChallengeDest', encodeData);
+        const response = await this.send(mdcAddress, ethers.BigNumber.from(0), data);
+        logger.debug(`MakerSubmitProof tx: ${JSON.stringify(response)}`);
         await this.jsondb.push(`/arbitrationHash/${txData.sourceId}`, {
-            ...txData,
-            submitSourceProofHash: response.hash,
+            verifyChallengeDestHash: response.hash,
             status: 1,
         });
+        logger.info(`makerSubmitProof end sourceId: ${txData.sourceId} responseMakersHash: ${txData.responseMakersHash} verifyChallengeDestHash: ${response.hash}`);
         return response as any;
     }
 }
