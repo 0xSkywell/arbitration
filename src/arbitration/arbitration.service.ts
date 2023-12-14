@@ -1,5 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { SchedulerRegistry } from '@nestjs/schedule';
+import { Injectable } from '@nestjs/common';
 import { JsonDB, Config } from 'node-json-db';
 import { utils, providers, ethers } from 'ethers';
 import MDCAbi from '../abi/MDC.abi.json';
@@ -11,6 +10,7 @@ import {
 import { HTTPPost, querySubgraph } from '../utils';
 import Keyv from 'keyv';
 import BigNumber from 'bignumber.js';
+import logger from '../utils/logger';
 
 const keyv = new Keyv();
 
@@ -32,7 +32,6 @@ export interface ChainRel {
 @Injectable()
 export class ArbitrationService {
     public jsondb = new JsonDB(new Config('runtime/arbitrationDB', true, false, '/'));
-    private readonly logger: Logger = new Logger(ArbitrationService.name);
 
     async verifyArbitrationConditions(sourceTx: ArbitrationTransaction): Promise<boolean> {
         // Arbitration time reached
@@ -123,20 +122,6 @@ export class ArbitrationService {
             url: arbitrationRPC,
         });
         transactionRequest.gasLimit = ethers.BigNumber.from(210000);
-        // try {
-        //     transactionRequest.gasLimit = transactionRequest.data ? await provider.estimateGas({
-        //         from: transactionRequest.from,
-        //         to: transactionRequest.to,
-        //         value: transactionRequest.value,
-        //         data: transactionRequest.data,
-        //     }) : await provider.estimateGas({
-        //         from: transactionRequest.from,
-        //         to: transactionRequest.to,
-        //         value: transactionRequest.value,
-        //     });
-        // } catch (e) {
-        //     this.logger.error(`transfer estimateGas error`, e.message);
-        // }
 
         let gasFee = new BigNumber(0);
         try {
@@ -147,21 +132,67 @@ export class ArbitrationService {
                 transactionRequest.maxPriorityFeePerGas = feeData.maxPriorityFeePerGas;
                 delete transactionRequest.gasPrice;
                 gasFee = new BigNumber(String(transactionRequest.gasLimit)).multipliedBy(String(transactionRequest.maxPriorityFeePerGas));
-                this.logger.log(`EIP1559 use maxFeePerGas: ${String(transactionRequest.maxFeePerGas)}, maxPriorityFeePerGas: ${String(transactionRequest.maxPriorityFeePerGas)}, gasLimit: ${String(transactionRequest.gasLimit)}`);
+                logger.info(`EIP1559 use maxFeePerGas: ${String(transactionRequest.maxFeePerGas)}, maxPriorityFeePerGas: ${String(transactionRequest.maxPriorityFeePerGas)}, gasLimit: ${String(transactionRequest.gasLimit)}`);
             } else {
                 transactionRequest.gasPrice = feeData.gasPrice;
                 gasFee = new BigNumber(String(transactionRequest.gasLimit)).multipliedBy(String(transactionRequest.gasPrice));
-                this.logger.log(`Legacy use gasPrice: ${String(transactionRequest.gasPrice)}, gasLimit: ${String(transactionRequest.gasLimit)}`);
+                logger.info(`Legacy use gasPrice: ${String(transactionRequest.gasPrice)}, gasLimit: ${String(transactionRequest.gasLimit)}`);
             }
         } catch (e) {
-            this.logger.error('get gas price error:', e);
+            logger.error('get gas price error:', e);
+        }
+
+        const balance = await provider.getBalance(transactionRequest.from);
+        if (new BigNumber(String(balance)).lt(gasFee)) {
+            logger.error(`Insufficient Balance: ${String(balance)} < ${String(gasFee)}`);
+            throw new Error('Insufficient Balance');
         }
 
         return gasFee;
     }
 
+    async getWallet() {
+        const arbitrationPrivateKey = process.env['ArbitrationPrivateKey'];
+        if (!arbitrationPrivateKey) {
+            throw new Error('arbitrationPrivateKey not config');
+        }
+        const chainId = process.env['NODE_ENV'] === 'production' ? '1' : '5';
+        const arbitrationRPC = process.env['ArbitrationRPC'];
+        if (!arbitrationRPC) {
+            throw new Error(`${chainId} arbitrationRPC not config`);
+        }
+        const provider = new providers.JsonRpcProvider({
+            url: arbitrationRPC,
+        });
+        // const provider = new ethers.JsonRpcProvider(arbitrationRPC);
+        return new ethers.Wallet(arbitrationPrivateKey).connect(provider);
+    }
+
+    async send(to, value, data) {
+        const account = await this.getWallet();
+        const chainId = await account.getChainId();
+        const transactionRequest = {
+            chainId,
+            data,
+            to,
+            value,
+            from: account.address,
+            nonce: await account.getTransactionCount('pending'),
+        };
+
+        const provider = new providers.JsonRpcProvider({
+            url: process.env['ArbitrationRPC'],
+        });
+        await this.getGasPrice(transactionRequest);
+        logger.info(`transactionRequest: ${JSON.stringify(transactionRequest)}`);
+        const signedTx = await account.signTransaction(transactionRequest);
+        const txHash = utils.keccak256(signedTx);
+        logger.info(`txHash: ${txHash}`);
+        return await provider.sendTransaction(signedTx);
+    }
+
     async handleUserArbitration(tx: ArbitrationTransaction) {
-        this.logger.log(`handleUserArbitration begin ${tx.sourceTxHash}`);
+        logger.info(`handleUserArbitration begin ${tx.sourceTxHash}`);
         const ifa = new ethers.utils.Interface(MDCAbi);
         const account = await this.getWallet();
         const mdcAddress = await this.getMDCAddress(tx.sourceMaker);
@@ -182,40 +213,16 @@ export class ArbitrationService {
             +tx.freezeAmount1,
             +parentNodeNumOfTargetNode,
         ];
-        this.logger.log(`encodeData: ${JSON.stringify(encodeData)}`);
+        // logger.info(`encodeData: ${JSON.stringify(encodeData)}`);
         const data = ifa.encodeFunctionData('challenge', encodeData);
-        const arbitrationRPC = process.env['ArbitrationRPC'];
-        const provider = new providers.JsonRpcProvider({
-            url: arbitrationRPC,
-        });
-        const chainId = await account.getChainId();
-        const transactionRequest = {
-            chainId,
-            data,
-            to: mdcAddress,
-            value: 0n,
-            from: account.address,
-            nonce: await account.getTransactionCount('pending'),
-        };
-        const gasFee = await this.getGasPrice(transactionRequest);
-        const balance = await provider.getBalance(account.address);
-        if (new BigNumber(String(balance)).lt(gasFee)) {
-            this.logger.error(`Insufficient Balance: ${String(balance)} < ${String(gasFee)}`);
-            return;
-        }
-        this.logger.log(`transactionRequest: ${JSON.stringify(transactionRequest)}`);
-
-        const signedTx = await account.signTransaction(transactionRequest);
-        const txHash = utils.keccak256(signedTx);
-        this.logger.log(`txHash: ${txHash}`);
-        const response = await provider.sendTransaction(signedTx);
-        this.logger.log(`handleUserArbitration tx: ${JSON.stringify(response)}`);
+        const response = await this.send(mdcAddress, ethers.BigNumber.from(0), data);
+        logger.info(`handleUserArbitration tx: ${JSON.stringify(response)}`);
         await this.jsondb.push(`/arbitrationHash/${tx.sourceTxHash.toLowerCase()}`, {
             fromChainId: tx.sourceChainId,
             submitSourceTxHash: response.hash,
             status: 0,
         });
-        this.logger.log(`handleUserArbitration success ${tx.sourceTxHash} ${response.hash}`);
+        logger.info(`handleUserArbitration success ${tx.sourceTxHash} ${response.hash}`);
         const res = await HTTPPost(`${process.env['ArbitrationHost']}/proof/userAskProof`, {
             isSource: 1,
             chainId: tx.sourceChainId,
@@ -224,24 +231,7 @@ export class ArbitrationService {
             challenger: account.address,
             spvAddress: tx.spvAddress,
         });
-        this.logger.log(`userAskProof ${JSON.stringify(res)}`);
-    }
-
-    async getWallet() {
-        const arbitrationPrivateKey = process.env['ArbitrationPrivateKey'];
-        if (!arbitrationPrivateKey) {
-            throw new Error('arbitrationPrivateKey not config');
-        }
-        const chainId = process.env['NODE_ENV'] === 'production' ? '1' : '5';
-        const arbitrationRPC = process.env['ArbitrationRPC'];
-        if (!arbitrationRPC) {
-            throw new Error(`${chainId} arbitrationRPC not config`);
-        }
-        const provider = new providers.JsonRpcProvider({
-            url: arbitrationRPC,
-        });
-        // const provider = new ethers.JsonRpcProvider(arbitrationRPC);
-        return new ethers.Wallet(arbitrationPrivateKey).connect(provider);
+        logger.info(`userAskProof ${JSON.stringify(res)}`);
     }
 
     async userSubmitProof(txData: VerifyChallengeSourceParams) {
@@ -251,25 +241,20 @@ export class ArbitrationService {
         const wallet = await this.getWallet();
         const mdcAddress = await this.getMDCAddress(txData.sourceMaker);
         const ifa = new ethers.utils.Interface(MDCAbi);
-        const data = ifa.encodeFunctionData('verifyChallengeSource', [
+        const encodeData = [
             wallet.address,
             txData.spvAddress,
             +txData.sourceChain,
             txData.proof,
             txData.rawDatas,
-            txData.rlpRuleBytes,
-        ]);
-        const transactionRequest = {
-            data,
-            to: mdcAddress,
-            value: 0n,
-            from: wallet.address,
-        };
-        const response: any = await wallet.populateTransaction(transactionRequest);
-        this.logger.log(`submitProof tx: ${response}`);
+            txData.rlpRuleBytes
+        ];
+        logger.info(`encodeData: ${JSON.stringify(encodeData)}`);
+        const data = ifa.encodeFunctionData('verifyChallengeSource', encodeData);
+        const response = await this.send(mdcAddress, ethers.BigNumber.from(0), data);
+        logger.info(`UserSubmitProof tx: ${JSON.stringify(response)}`);
         await this.jsondb.push(`/arbitrationHash/${txData.hash}`, {
-            ...txData,
-            submitSourceProofHash: response.transactionHash,
+            submitSourceProofHash: response.hash,
             status: 1,
         });
         return response as any;
@@ -279,9 +264,7 @@ export class ArbitrationService {
         if (!txData.proof) {
             throw new Error(`proof is empty`);
         }
-        const wallet = await this.getWallet();
         const ifa = new ethers.utils.Interface(MDCAbi);
-
         const chainRels = await this.getChainRels();
         const mdcAddress = await this.getMDCAddress(txData.sourceMaker);
         const chain = chainRels.find(c => +c.id === +txData.sourceChain);
@@ -308,17 +291,11 @@ export class ArbitrationService {
             verifiedSourceTxData,
             txData.rawDatas,
         ]);
-        const transactionRequest = {
-            data,
-            to: mdcAddress,
-            value: '0x',
-            from: wallet.address,
-        };
-        const response: any = await wallet.populateTransaction(transactionRequest);
-        this.logger.log('===submitProof tx', response);
+        const response = await this.send(mdcAddress,ethers.BigNumber.from(0),data);
+        logger.info(`MakerSubmitProof tx: ${JSON.stringify(response)}`);
         await this.jsondb.push(`/arbitrationHash/${txData.sourceId}`, {
             ...txData,
-            submitSourceProofHash: response.transactionHash,
+            submitSourceProofHash: response.hash,
             status: 1,
         });
         return response as any;

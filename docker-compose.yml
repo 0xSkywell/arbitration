@@ -13,7 +13,8 @@ services:
       SubgraphEndpoint: '${SubgraphEndpoint}'
       ArbitrationHost: '${ArbitrationHost}'
       ArbitrationPrivateKey: '${ArbitrationPrivateKey}'
-      MakerList: '${makerList}'
+      MakerList: '${MakerList}'
+      Debug: '${Debug}'
     ports:
       - '3000:3000'
     networks:
