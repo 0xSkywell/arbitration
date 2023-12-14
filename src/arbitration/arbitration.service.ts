@@ -11,6 +11,7 @@ import {
 import { HTTPPost, querySubgraph } from '../utils';
 import Keyv from 'keyv';
 import BigNumber from 'bignumber.js';
+
 const keyv = new Keyv();
 
 export interface ChainRel {
@@ -57,11 +58,10 @@ export class ArbitrationService {
     }
           `;
         const result = await querySubgraph(queryStr);
-        console.log('getMDCAddress', result?.data?.mdcs?.[0]?.id);
         return result?.data?.mdcs?.[0]?.id;
     }
 
-    async getChainRels():Promise<ChainRel[]> {
+    async getChainRels(): Promise<ChainRel[]> {
         let chainRels = await keyv.get('ChainRels');
         if (!chainRels) {
             const queryStr = `
@@ -87,6 +87,26 @@ export class ArbitrationService {
             await keyv.set('ChainRels', chainRels, 1000 * 5);
         }
         return chainRels;
+    }
+
+    async getChallengeNodeNumber(owner, newChallengeNodeNumber) {
+        const queryStr = `
+    {
+        createChallenges(
+            where: {
+                challengeNodeNumber_gt: "${newChallengeNodeNumber}", 
+                challengeManager_: {owner: "${owner}"}
+            }
+            orderBy: challengeNodeNumber
+            orderDirection: asc
+            first: 1
+        ) {
+            challengeNodeNumber
+        }
+    }
+          `;
+        const result = await querySubgraph(queryStr);
+        return result?.data?.createChallenges?.[0]?.challengeNodeNumber;
     }
 
     async getJSONDBData(dataPath) {
@@ -143,32 +163,13 @@ export class ArbitrationService {
     async handleUserArbitration(tx: ArbitrationTransaction) {
         this.logger.log(`handleUserArbitration begin ${tx.sourceTxHash}`);
         const ifa = new ethers.utils.Interface(MDCAbi);
-        if (!tx.sourceTxTime) {
-            throw new Error('sourceTxTime not found');
-        }
-        if (!tx.sourceChainId) {
-            throw new Error('sourceChainId not found');
-        }
-        if (!tx.sourceTxBlockNum) {
-            throw new Error('sourceTxBlockNum not found');
-        }
-        if (!tx.sourceTxIndex) {
-            throw new Error('sourceTxIndex not found');
-        }
-        if (!tx.sourceTxHash) {
-            throw new Error('sourceTxHash not found');
-        }
-        if (!tx.ruleKey) {
-            throw new Error('ruleKey not found');
-        }
-        if (!tx.freezeToken) {
-            throw new Error('freezeToken not found');
-        }
-        if (!tx.freezeAmount1) {
-            throw new Error('freezeAmount1 not found');
-        }
         const account = await this.getWallet();
         const mdcAddress = await this.getMDCAddress(tx.sourceMaker);
+        const newChallengeNodeNumber = utils.defaultAbiCoder.encode(
+            ['uint64', 'uint64', 'uint64', 'uint64'],
+            [+tx.sourceTxTime, +tx.sourceChainId, +tx.sourceTxBlockNum, +tx.sourceTxIndex],
+        );
+        const parentNodeNumOfTargetNode = await this.getChallengeNodeNumber(tx.sourceMaker, newChallengeNodeNumber);
         // Obtaining arbitration deposit
         const encodeData = [
             +tx.sourceTxTime,
@@ -179,11 +180,10 @@ export class ArbitrationService {
             tx.ruleKey,
             tx.freezeToken,
             +tx.freezeAmount1,
-            +tx.parentNodeNumOfTargetNode || 0,
+            +parentNodeNumOfTargetNode,
         ];
         this.logger.log(`encodeData: ${JSON.stringify(encodeData)}`);
         const data = ifa.encodeFunctionData('challenge', encodeData);
-
         const arbitrationRPC = process.env['ArbitrationRPC'];
         const provider = new providers.JsonRpcProvider({
             url: arbitrationRPC,
@@ -311,7 +311,7 @@ export class ArbitrationService {
         const transactionRequest = {
             data,
             to: mdcAddress,
-            value: "0x",
+            value: '0x',
             from: wallet.address,
         };
         const response: any = await wallet.populateTransaction(transactionRequest);
