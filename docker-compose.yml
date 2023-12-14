@@ -15,6 +15,9 @@ services:
       ArbitrationPrivateKey: '${ArbitrationPrivateKey}'
       MakerList: '${MakerList}'
       Debug: '${Debug}'
+      GasLimit: '${GasLimit}'
+      MaxFeePerGas: '${MaxFeePerGas}'
+      MaxPriorityFeePerGas: '${MaxPriorityFeePerGas}'
     ports:
       - '3000:3000'
     networks:

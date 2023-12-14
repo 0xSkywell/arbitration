@@ -124,7 +124,11 @@ export class ArbitrationService {
         const provider = new providers.JsonRpcProvider({
             url: arbitrationRPC,
         });
-        transactionRequest.gasLimit = ethers.BigNumber.from(10000000);
+        if (process.env['GasLimit']) {
+            transactionRequest.gasLimit = ethers.BigNumber.from(process.env['GasLimit']);
+        } else {
+            transactionRequest.gasLimit = ethers.BigNumber.from(10000000);
+        }
 
         // try {
         //     transactionRequest.gasLimit = await provider.estimateGas({
@@ -137,24 +141,29 @@ export class ArbitrationService {
         //     logger.error('get gas limit error:', e);
         // }
 
-        let gasFee = new BigNumber(0);
-        try {
-            const feeData = await provider.getFeeData();
-            if (feeData.maxFeePerGas && feeData.maxPriorityFeePerGas) {
-                transactionRequest.type = 2;
-                transactionRequest.maxFeePerGas = feeData.maxFeePerGas;
-                transactionRequest.maxPriorityFeePerGas = feeData.maxPriorityFeePerGas;
-                delete transactionRequest.gasPrice;
-                gasFee = new BigNumber(String(transactionRequest.gasLimit)).multipliedBy(String(transactionRequest.maxPriorityFeePerGas));
-                logger.info(`EIP1559 use maxFeePerGas: ${String(transactionRequest.maxFeePerGas)}, maxPriorityFeePerGas: ${String(transactionRequest.maxPriorityFeePerGas)}, gasLimit: ${String(transactionRequest.gasLimit)}`);
-            } else {
-                transactionRequest.gasPrice = Math.max(1500000000, +feeData.gasPrice);
-                gasFee = new BigNumber(String(transactionRequest.gasLimit)).multipliedBy(String(transactionRequest.gasPrice));
-                logger.info(`Legacy use gasPrice: ${String(transactionRequest.gasPrice)}, gasLimit: ${String(transactionRequest.gasLimit)}`);
+        if (process.env['MaxFeePerGas'] && process.env['MaxPriorityFeePerGas']) {
+            transactionRequest.type = 2;
+            transactionRequest.maxFeePerGas = ethers.BigNumber.from(process.env['MaxFeePerGas']);
+            transactionRequest.maxPriorityFeePerGas = ethers.BigNumber.from(process.env['MaxPriorityFeePerGas']);
+        } else {
+            try {
+                const feeData = await provider.getFeeData();
+                if (feeData.maxFeePerGas && feeData.maxPriorityFeePerGas) {
+                    transactionRequest.type = 2;
+                    transactionRequest.maxFeePerGas = process.env['MaxFeePerGas'] || feeData.maxFeePerGas;
+                    transactionRequest.maxPriorityFeePerGas = process.env['MaxPriorityFeePerGas'] || feeData.maxPriorityFeePerGas;
+                    delete transactionRequest.gasPrice;
+                } else {
+                    transactionRequest.gasPrice = Math.max(1500000000, +feeData.gasPrice);
+                    logger.info(`Legacy use gasPrice: ${String(transactionRequest.gasPrice)}, gasLimit: ${String(transactionRequest.gasLimit)}`);
+                }
+            } catch (e) {
+                logger.error('get gas price error:', e);
             }
-        } catch (e) {
-            logger.error('get gas price error:', e);
         }
+
+        const gasFee = new BigNumber(String(transactionRequest.gasLimit)).multipliedBy(String(transactionRequest.maxPriorityFeePerGas || 0));
+        logger.info(`maxFeePerGas: ${String(transactionRequest.maxFeePerGas)}, maxPriorityFeePerGas: ${String(transactionRequest.maxPriorityFeePerGas)}, gasLimit: ${String(transactionRequest.gasLimit)}`);
 
         const balance = await provider.getBalance(transactionRequest.from);
         if (new BigNumber(String(balance)).lt(gasFee)) {
