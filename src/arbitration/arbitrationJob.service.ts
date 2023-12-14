@@ -23,8 +23,7 @@ export class ArbitrationJobService {
         if (proofMutex.isLocked()) {
             return;
         }
-        proofMutex
-            .runExclusive(async () => {
+        await proofMutex.runExclusive(async () => {
                 const arbitrationObj = await this.arbitrationService.getJSONDBData(`/arbitrationHash`);
                 for (const hash in arbitrationObj) {
                     if (arbitrationObj[hash] && arbitrationObj[hash].status) continue;
@@ -65,8 +64,7 @@ export class ArbitrationJobService {
         if (mutex.isLocked()) {
             return;
         }
-        mutex
-            .runExclusive(async () => {
+        mutex.runExclusive(async () => {
                 try {
                     const endTime = new Date().valueOf();
                     const res: any = await HTTPGet(`${process.env['ArbitrationHost']}/transaction/unreimbursedTransactions?startTime=${startTime - 1000 * 60 * 60 * 24}&endTime=${endTime}`);

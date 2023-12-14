@@ -10,6 +10,7 @@ export interface ArbitrationTransaction {
     freezeAmount1: string;
     parentNodeNumOfTargetNode: number;
     spvAddress: string;
+    minChallengeDepositAmount: string;
 }
 
 export interface VerifyChallengeSourceParams {

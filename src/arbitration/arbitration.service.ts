@@ -88,21 +88,24 @@ export class ArbitrationService {
         return chainRels;
     }
 
-    async getChallengeNodeNumber(owner, newChallengeNodeNumber) {
+    async getChallengeNodeNumber(owner: string, mdcAddress: string, newChallengeNodeNumber: string) {
         const queryStr = `
-    {
-        createChallenges(
-            where: {
-                challengeNodeNumber_gt: "${newChallengeNodeNumber}", 
-                challengeManager_: {owner: "${owner}"}
+        {
+            createChallenges(
+                where: {
+                    challengeNodeNumber_gt: "${newChallengeNodeNumber}"
+                    challengeManager_: {
+                        owner: "${owner}"
+                        mdcAddr: "${mdcAddress}"
+                    }
+                }
+                orderBy: challengeNodeNumber
+                orderDirection: asc
+                first: 1
+            ) {
+                challengeNodeNumber
             }
-            orderBy: challengeNodeNumber
-            orderDirection: asc
-            first: 1
-        ) {
-            challengeNodeNumber
         }
-    }
           `;
         const result = await querySubgraph(queryStr);
         return result?.data?.createChallenges?.[0]?.challengeNodeNumber;
@@ -121,7 +124,18 @@ export class ArbitrationService {
         const provider = new providers.JsonRpcProvider({
             url: arbitrationRPC,
         });
-        transactionRequest.gasLimit = ethers.BigNumber.from(210000);
+        transactionRequest.gasLimit = ethers.BigNumber.from(10000000);
+
+        // try {
+        //     transactionRequest.gasLimit = await provider.estimateGas({
+        //         from: transactionRequest.from,
+        //         to: transactionRequest.to,
+        //         data: transactionRequest.data,
+        //         value: transactionRequest.value,
+        //     });
+        // } catch (e) {
+        //     logger.error('get gas limit error:', e);
+        // }
 
         let gasFee = new BigNumber(0);
         try {
@@ -134,7 +148,7 @@ export class ArbitrationService {
                 gasFee = new BigNumber(String(transactionRequest.gasLimit)).multipliedBy(String(transactionRequest.maxPriorityFeePerGas));
                 logger.info(`EIP1559 use maxFeePerGas: ${String(transactionRequest.maxFeePerGas)}, maxPriorityFeePerGas: ${String(transactionRequest.maxPriorityFeePerGas)}, gasLimit: ${String(transactionRequest.gasLimit)}`);
             } else {
-                transactionRequest.gasPrice = feeData.gasPrice;
+                transactionRequest.gasPrice = Math.max(1500000000, +feeData.gasPrice);
                 gasFee = new BigNumber(String(transactionRequest.gasLimit)).multipliedBy(String(transactionRequest.gasPrice));
                 logger.info(`Legacy use gasPrice: ${String(transactionRequest.gasPrice)}, gasLimit: ${String(transactionRequest.gasLimit)}`);
             }
@@ -200,7 +214,8 @@ export class ArbitrationService {
             ['uint64', 'uint64', 'uint64', 'uint64'],
             [+tx.sourceTxTime, +tx.sourceChainId, +tx.sourceTxBlockNum, +tx.sourceTxIndex],
         );
-        const parentNodeNumOfTargetNode = await this.getChallengeNodeNumber(tx.sourceMaker, newChallengeNodeNumber);
+        const parentNodeNumOfTargetNode = await this.getChallengeNodeNumber(tx.sourceMaker, mdcAddress, newChallengeNodeNumber);
+        console.log('parentNodeNumOfTargetNode',parentNodeNumOfTargetNode)
         // Obtaining arbitration deposit
         const encodeData = [
             +tx.sourceTxTime,
@@ -210,12 +225,16 @@ export class ArbitrationService {
             tx.sourceTxHash,
             tx.ruleKey,
             tx.freezeToken,
-            +tx.freezeAmount1,
-            +parentNodeNumOfTargetNode,
+            ethers.BigNumber.from(tx.freezeAmount1).toNumber(),
+            ethers.BigNumber.from(parentNodeNumOfTargetNode),
         ];
         logger.debug(`encodeData: ${JSON.stringify(encodeData)}`);
         const data = ifa.encodeFunctionData('challenge', encodeData);
-        const response = await this.send(mdcAddress, ethers.BigNumber.from(0), data);
+        const sendValue =
+            tx.freezeToken === '0x0000000000000000000000000000000000000000' ?
+            ethers.BigNumber.from(new BigNumber(tx.freezeAmount1).plus(tx.minChallengeDepositAmount || 0).toString()) :
+            ethers.BigNumber.from(0);
+        const response = await this.send(mdcAddress, sendValue, data);
         logger.debug(`handleUserArbitration tx: ${JSON.stringify(response)}`);
         await this.jsondb.push(`/arbitrationHash/${tx.sourceTxHash.toLowerCase()}`, {
             fromChainId: tx.sourceChainId,
