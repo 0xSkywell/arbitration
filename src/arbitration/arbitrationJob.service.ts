@@ -53,7 +53,7 @@ export class ArbitrationJobService {
             });
     }
 
-    @Cron('*/5 * * * * *', {
+    @Cron('*/30 * * * * *', {
         name: 'userArbitrationJob',
     })
     getListOfUnrefundedTransactions() {
@@ -95,7 +95,7 @@ export class ArbitrationJobService {
             });
     }
 
-    @Cron('*/5 * * * * *', {
+    @Cron('*/30 * * * * *', {
         name: 'makerArbitrationJob',
     })
     getListOfUnresponsiveTransactions() {
