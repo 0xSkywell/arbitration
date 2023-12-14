@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, Interval } from '@nestjs/schedule';
 import { Mutex } from 'async-mutex';
 import { ArbitrationService } from './arbitration.service';
-import { ArbitrationDB, ArbitrationTransaction } from './arbitration.interface';
+import { ArbitrationTransaction } from './arbitration.interface';
 import { HTTPGet, HTTPPost } from '../utils';
 
 const mutex = new Mutex();
@@ -114,28 +114,11 @@ export class ArbitrationJobService {
                             console.log('tx exist', item.hash.toLowerCase());
                             continue;
                         }
-                        const arbitrationData: ArbitrationDB = {
-                            proof: item.proof,
-                            targetTxHash: item.hash,
-                            mdcAddress: item.mdcAddress,
-                            makerAddress: item.makerAddress,
-                            isSource: item.isSource,
-                            sourceChain: item.sourceChain,
-                            targetChain: item.targetChain,
+                        const userSubmitTx = {
+                            hash: item.hash,
                             challenger: item.challenger,
-                            spvAddress: item.spvAddress,
-                            rawDatas: item.rawDatas,
-                            rlpRuleBytes: item.rlpRuleBytes,
-                            targetNonce: item.targetNonce,
-                            targetFrom: item.targetFrom,
-                            targetToken: item.targetToken,
-                            targetAmount: item.targetAmount,
-                            responseMakersHash: item.responseMakersHash,
-                            responseTime: item.responseTime,
-                            sourceTxHash: item.hash.toLowerCase(),
-                            status: 0,
                         };
-                        await this.arbitrationService.jsondb.push(`/arbitrationHash/${item.hash.toLowerCase()}`, arbitrationData);
+                        await this.arbitrationService.jsondb.push(`/arbitrationHash/${item.hash.toLowerCase()}`, userSubmitTx);
                         this.logger.log(`maker response arbitration ${item.targetChain} ${item.hash}`);
                         await HTTPPost(`${process.env['ArbitrationHost']}/proof/makerAskProof`, {
                             isSource: 0,

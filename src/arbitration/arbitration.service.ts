@@ -4,7 +4,6 @@ import { JsonDB, Config } from 'node-json-db';
 import { utils, providers, ethers } from 'ethers';
 import MDCAbi from '../abi/MDC.abi.json';
 import {
-    ArbitrationDB,
     ArbitrationTransaction,
     VerifyChallengeDestParams,
     VerifyChallengeSourceParams,
@@ -32,9 +31,6 @@ export interface ChainRel {
 export class ArbitrationService {
     public jsondb = new JsonDB(new Config('runtime/arbitrationDB', true, false, '/'));
     private readonly logger: Logger = new Logger(ArbitrationService.name);
-
-    constructor(private schedulerRegistry: SchedulerRegistry) {
-    }
 
     async verifyArbitrationConditions(sourceTx: ArbitrationTransaction): Promise<boolean> {
         // Arbitration time reached
