@@ -8,7 +8,7 @@ services:
     container_name: arbitration-client
     restart: always
     environment:
-      NODE_ENV: 'development'
+      MAIN_NETWORK: '${MAIN_NETWORK}'
       ArbitrationRPC: '${ArbitrationRPC}'
       SubgraphEndpoint: '${SubgraphEndpoint}'
       ArbitrationHost: '${ArbitrationHost}'

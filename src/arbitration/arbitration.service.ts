@@ -179,7 +179,7 @@ export class ArbitrationService {
         if (!arbitrationPrivateKey) {
             throw new Error('arbitrationPrivateKey not config');
         }
-        const chainId = process.env['NODE_ENV'] === 'production' ? '1' : '5';
+        const chainId = process.env['MAIN_NETWORK'] || '1';
         const arbitrationRPC = process.env['ArbitrationRPC'];
         if (!arbitrationRPC) {
             throw new Error(`${chainId} arbitrationRPC not config`);
