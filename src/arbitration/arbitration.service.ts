@@ -10,6 +10,7 @@ import {
 } from './arbitration.interface';
 import { HTTPPost, querySubgraph } from '../utils';
 import Keyv from 'keyv';
+import BigNumber from 'bignumber.js';
 const keyv = new Keyv();
 
 export interface ChainRel {
@@ -117,7 +118,7 @@ export class ArbitrationService {
         //     this.logger.error(`transfer estimateGas error`, e.message);
         // }
 
-
+        let gasFee = new BigNumber(0);
         try {
             const feeData = await provider.getFeeData();
             if (feeData.maxFeePerGas && feeData.maxPriorityFeePerGas) {
@@ -125,14 +126,18 @@ export class ArbitrationService {
                 transactionRequest.maxFeePerGas = feeData.maxFeePerGas;
                 transactionRequest.maxPriorityFeePerGas = feeData.maxPriorityFeePerGas;
                 delete transactionRequest.gasPrice;
+                gasFee = new BigNumber(String(transactionRequest.gasLimit)).multipliedBy(String(transactionRequest.maxPriorityFeePerGas));
                 this.logger.log(`EIP1559 use maxFeePerGas: ${String(transactionRequest.maxFeePerGas)}, maxPriorityFeePerGas: ${String(transactionRequest.maxPriorityFeePerGas)}, gasLimit: ${String(transactionRequest.gasLimit)}`);
             } else {
                 transactionRequest.gasPrice = feeData.gasPrice;
+                gasFee = new BigNumber(String(transactionRequest.gasLimit)).multipliedBy(String(transactionRequest.gasPrice));
                 this.logger.log(`Legacy use gasPrice: ${String(transactionRequest.gasPrice)}, gasLimit: ${String(transactionRequest.gasLimit)}`);
             }
         } catch (e) {
             this.logger.error('get gas price error:', e);
         }
+
+        return gasFee;
     }
 
     async handleUserArbitration(tx: ArbitrationTransaction) {
@@ -165,7 +170,6 @@ export class ArbitrationService {
         const account = await this.getWallet();
         const mdcAddress = await this.getMDCAddress(tx.sourceMaker);
         // Obtaining arbitration deposit
-        // TODO: Verify Balance
         const encodeData = [
             +tx.sourceTxTime,
             +tx.sourceChainId,
@@ -177,7 +181,7 @@ export class ArbitrationService {
             +tx.freezeAmount1,
             +tx.parentNodeNumOfTargetNode || 0,
         ];
-        console.log('encodeData', encodeData);
+        this.logger.log(`encodeData: ${JSON.stringify(encodeData)}`);
         const data = ifa.encodeFunctionData('challenge', encodeData);
 
         const arbitrationRPC = process.env['ArbitrationRPC'];
@@ -193,8 +197,13 @@ export class ArbitrationService {
             from: account.address,
             nonce: await account.getTransactionCount('pending'),
         };
-        await this.getGasPrice(transactionRequest);
-        console.log('transactionRequest', transactionRequest);
+        const gasFee = await this.getGasPrice(transactionRequest);
+        const balance = await provider.getBalance(account.address);
+        if (new BigNumber(String(balance)).lt(gasFee)) {
+            this.logger.error(`Insufficient Balance: ${String(balance)} < ${String(gasFee)}`);
+            return;
+        }
+        this.logger.log(`transactionRequest: ${JSON.stringify(transactionRequest)}`);
 
         const signedTx = await account.signTransaction(transactionRequest);
         const txHash = utils.keccak256(signedTx);
@@ -216,7 +225,6 @@ export class ArbitrationService {
             spvAddress: tx.spvAddress,
         });
         this.logger.log(`userAskProof ${JSON.stringify(res)}`);
-        // return response as any;
     }
 
     async getWallet() {
