@@ -123,7 +123,7 @@ export class ArbitrationJobService {
                             isNeedProof: 1,
                             challenger: challengerData.verifyPassChallenger,
                         });
-                        logger.info(`maker response arbitration ${hash}`);
+                        logger.info(`maker ask proof ${hash}`);
                         await HTTPPost(`${process.env['ArbitrationHost']}/proof/makerAskProof`, {
                             hash,
                         });

@@ -300,15 +300,6 @@ export class ArbitrationService {
             isNeedProof: 1
         });
         logger.info(`handleUserArbitration success ${tx.sourceTxHash} ${response.hash}`);
-        const res = await HTTPPost(`${process.env['ArbitrationHost']}/proof/userAskProof`, {
-            isSource: 1,
-            chainId: tx.sourceChainId,
-            hash: tx.sourceTxHash,
-            mdcAddress,
-            challenger: account.address,
-            spvAddress: tx.spvAddress,
-        });
-        logger.info(`userAskProof ${JSON.stringify(res)}`);
     }
 
     async userSubmitProof(txData: VerifyChallengeSourceParams) {
