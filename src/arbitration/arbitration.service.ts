@@ -354,21 +354,22 @@ export class ArbitrationService {
             throw new Error('ChainRels not found');
         }
         const responseMakerList = await this.getResponseMakerList(txData.sourceTime);
-        const responseMakersHash = utils.defaultAbiCoder.encode(
+        const rawDatas = utils.defaultAbiCoder.encode(
             ['uint256[]'],
             [responseMakerList.map(item => ethers.BigNumber.from(item))],
         );
+        const responseMakersHash = utils.keccak256(rawDatas);
         const responseTime = txData.sourceTime;
 
         const verifiedSourceTxData = [
-            +chain.minVerifyChallengeSourceTxSecond,
-            +chain.maxVerifyChallengeSourceTxSecond,
-            +txData.targetNonce,
-            +txData.targetChain,
-            +txData.targetAddress,
-            +txData.targetToken,
-            +txData.targetAmount,
-            responseMakersHash,
+            ethers.BigNumber.from(chain.minVerifyChallengeSourceTxSecond),
+            ethers.BigNumber.from(chain.maxVerifyChallengeSourceTxSecond),
+            ethers.BigNumber.from(txData.targetNonce),
+            ethers.BigNumber.from(txData.targetChain),
+            ethers.BigNumber.from(txData.targetAddress),
+            ethers.BigNumber.from(txData.targetToken),
+            ethers.BigNumber.from(txData.targetAmount),
+            ethers.BigNumber.from(responseMakersHash),
             responseTime,
         ];
         const encodeData = [
@@ -378,7 +379,7 @@ export class ArbitrationService {
             txData.sourceId,
             txData.proof,
             verifiedSourceTxData,
-            txData.rawDatas,
+            rawDatas,
         ];
         logger.debug(`encodeData: ${JSON.stringify(encodeData)}`);
         const data = ifa.encodeFunctionData('verifyChallengeDest', encodeData);
