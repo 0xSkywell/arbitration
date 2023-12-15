@@ -111,6 +111,24 @@ export class ArbitrationService {
         return result?.data?.createChallenges?.[0]?.challengeNodeNumber;
     }
 
+    async getResponseMakerList(sourceTime: string) {
+        const queryStr = `
+            {
+              mdcs (
+                where:{
+                  responseMakersSnapshot_:{
+                  enableTimestamp_lt:"${sourceTime}"
+              }}){
+                responseMakersSnapshot {
+                  responseMakerList
+                }
+              }
+            }
+          `;
+        const result = await querySubgraph(queryStr);
+        return result?.data?.responseMakersSnapshot?.[0]?.responseMakerList || [];
+    }
+
     async getJSONDBData(dataPath) {
         try {
             return await this.jsondb.getData(dataPath);
@@ -235,7 +253,7 @@ export class ArbitrationService {
             tx.ruleKey,
             tx.freezeToken,
             ethers.BigNumber.from(tx.freezeAmount1).toNumber(),
-            ethers.BigNumber.from(parentNodeNumOfTargetNode),
+            ethers.BigNumber.from(parentNodeNumOfTargetNode || 0),
         ];
         logger.debug(`encodeData: ${JSON.stringify(encodeData)}`);
         const data = ifa.encodeFunctionData('challenge', encodeData);
@@ -264,7 +282,8 @@ export class ArbitrationService {
 
     async userSubmitProof(txData: VerifyChallengeSourceParams) {
         if (!txData.proof) {
-            throw new Error(`proof is empty`);
+            logger.error('proof is empty');
+            return;
         }
         logger.info(`userSubmitProof begin ${txData.hash}`);
         const wallet = await this.getWallet();
@@ -292,7 +311,8 @@ export class ArbitrationService {
 
     async makerSubmitProof(txData: VerifyChallengeDestParams) {
         if (!txData.proof) {
-            throw new Error(`proof is empty`);
+            logger.error('proof is empty');
+            return;
         }
         logger.info(`makerSubmitProof begin sourceId: ${txData.sourceId} responseMakersHash: ${txData.responseMakersHash}`);
         const ifa = new ethers.utils.Interface(MDCAbi);
@@ -302,6 +322,13 @@ export class ArbitrationService {
         if (!chain) {
             throw new Error('ChainRels not found');
         }
+        const responseMakerList = await this.getResponseMakerList(txData.sourceTime);
+        const responseMakersHash = utils.defaultAbiCoder.encode(
+            ['uint256[]'],
+            [responseMakerList.map(item => ethers.BigNumber.from(item))],
+        );
+        const responseTime = txData.sourceTime;
+
         const verifiedSourceTxData = [
             +chain.minVerifyChallengeSourceTxSecond,
             +chain.maxVerifyChallengeSourceTxSecond,
@@ -310,8 +337,8 @@ export class ArbitrationService {
             +txData.targetAddress,
             +txData.targetToken,
             +txData.targetAmount,
-            +txData.responseMakersHash,
-            +txData.responseTime,
+            responseMakersHash,
+            responseTime,
         ];
         const encodeData = [
             txData.challenger,
