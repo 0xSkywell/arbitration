@@ -27,7 +27,7 @@ export class ArbitrationJobService {
                 const arbitrationObj = await this.arbitrationService.getJSONDBData(`/arbitrationHash`);
                 for (const hash in arbitrationObj) {
                     if (arbitrationObj[hash] && !arbitrationObj[hash].isNeedProof) continue;
-                    const url = `${process.env['ArbitrationHost']}/proof/${isMaker ? 'targetId' : 'sourceId'}/${hash}`;
+                    const url = `${process.env['ArbitrationHost']}/proof/${isMaker ? 'verifyChallengeDestParams' : 'verifyChallengeSourceParams'}/${hash}`;
                     const result: any = await HTTPGet(url);
                     logger.debug(`curl === ${url}`);
                     const proofDataList: any[] = result?.data;
