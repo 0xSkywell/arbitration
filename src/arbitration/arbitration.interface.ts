@@ -31,12 +31,9 @@ export interface VerifyChallengeDestParams {
     targetAddress: string;
     targetToken: string;
     targetAmount: string;
-    responseMakersHash: string;
-    responseTime: string;
     challenger: string;
     spvAddress: string;
     sourceChain: string;
     sourceId: string;
     proof: string;
-    rawDatas: string;
 }

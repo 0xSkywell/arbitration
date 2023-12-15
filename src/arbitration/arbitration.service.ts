@@ -150,9 +150,9 @@ export class ArbitrationService {
         if (!challengerList) return [];
         const list = [];
         for (const challenger of challengerList) {
-            if(challenger.challengeStatuses !== 'VERIFY_SOURCE')continue;
+            if (challenger.challengeStatuses !== 'VERIFY_SOURCE') continue;
             const verifyPassChallenger = challenger.verifyPassChallenger;
-            if (!challenger.createChallenge) continue;
+            if (!challenger.createChallenge || !verifyPassChallenger) continue;
             const sourceTxHash = (challenger.createChallenge.find(item => item.isVerifyPass))?.sourceTxHash;
             if (!sourceTxHash) continue;
             list.push({ verifyPassChallenger, sourceTxHash });
@@ -345,7 +345,7 @@ export class ArbitrationService {
             logger.error('proof is empty');
             return;
         }
-        logger.info(`makerSubmitProof begin sourceId: ${txData.sourceId} responseMakersHash: ${txData.responseMakersHash}`);
+        logger.info(`makerSubmitProof begin sourceId: ${txData.sourceId}`);
         const ifa = new ethers.utils.Interface(MDCAbi);
         const chainRels = await this.getChainRels();
         const mdcAddress = await this.getMDCAddress(txData.sourceMaker);
@@ -389,7 +389,7 @@ export class ArbitrationService {
             verifyChallengeDestHash: response.hash,
             isNeedProof: 0
         });
-        logger.info(`makerSubmitProof end sourceId: ${txData.sourceId} responseMakersHash: ${txData.responseMakersHash} verifyChallengeDestHash: ${response.hash}`);
+        logger.info(`makerSubmitProof end sourceId: ${txData.sourceId} verifyChallengeDestHash: ${response.hash}`);
         return response as any;
     }
 }

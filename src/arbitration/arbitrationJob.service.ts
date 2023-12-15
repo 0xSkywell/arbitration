@@ -39,7 +39,10 @@ export class ArbitrationJobService {
                             continue;
                         }
                         if (isMaker) {
-                            await this.arbitrationService.makerSubmitProof(proofData);
+                            await this.arbitrationService.makerSubmitProof({
+                                ...proofData,
+                                challenger: arbitrationObj[hash].challenger,
+                            });
                         } else {
                             await this.arbitrationService.userSubmitProof(proofData);
                         }
@@ -109,14 +112,17 @@ export class ArbitrationJobService {
             try {
                 for (const makerAddress of makerList) {
                     const challengerList = await this.arbitrationService.getVerifyPassChallenger(makerAddress);
-                    for (const challenger of challengerList) {
-                        const hash = challenger.sourceTxHash.toLowerCase();
+                    for (const challengerData of challengerList) {
+                        const hash = challengerData.sourceTxHash.toLowerCase();
                         const data = await this.arbitrationService.getJSONDBData(`/arbitrationHash/${hash}`);
                         if (data) {
                             logger.debug('tx exist', hash);
                             continue;
                         }
-                        await this.arbitrationService.jsondb.push(`/arbitrationHash/${hash}`, { isNeedProof: 1 });
+                        await this.arbitrationService.jsondb.push(`/arbitrationHash/${hash}`, {
+                            isNeedProof: 1,
+                            challenger: challengerData.verifyPassChallenger,
+                        });
                         logger.info(`maker response arbitration ${hash}`);
                         await HTTPPost(`${process.env['ArbitrationHost']}/proof/makerAskProof`, {
                             hash,
