@@ -248,7 +248,7 @@ export class ArbitrationService {
         await this.jsondb.push(`/arbitrationHash/${tx.sourceTxHash.toLowerCase()}`, {
             fromChainId: tx.sourceChainId,
             submitSourceTxHash: response.hash,
-            status: 0,
+            isNeedProof: 1
         });
         logger.info(`handleUserArbitration success ${tx.sourceTxHash} ${response.hash}`);
         const res = await HTTPPost(`${process.env['ArbitrationHost']}/proof/userAskProof`, {
@@ -284,7 +284,7 @@ export class ArbitrationService {
         logger.debug(`UserSubmitProof tx: ${JSON.stringify(response)}`);
         await this.jsondb.push(`/arbitrationHash/${txData.hash}`, {
             verifyChallengeSourceHash: response.hash,
-            status: 1,
+            isNeedProof: 0
         });
         logger.info(`userSubmitProof end ${txData.hash} ${response.hash}`);
         return response as any;
@@ -328,7 +328,7 @@ export class ArbitrationService {
         logger.debug(`MakerSubmitProof tx: ${JSON.stringify(response)}`);
         await this.jsondb.push(`/arbitrationHash/${txData.sourceId}`, {
             verifyChallengeDestHash: response.hash,
-            status: 1,
+            isNeedProof: 0
         });
         logger.info(`makerSubmitProof end sourceId: ${txData.sourceId} responseMakersHash: ${txData.responseMakersHash} verifyChallengeDestHash: ${response.hash}`);
         return response as any;

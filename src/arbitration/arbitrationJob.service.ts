@@ -19,29 +19,21 @@ export class ArbitrationJobService {
     @Interval(1000 * 60)
     async syncProof() {
         const isMaker = !!process.env['MakerList'];
-        console.log('syncProof ====', isMaker);
         if (proofMutex.isLocked()) {
             return;
         }
         await proofMutex.runExclusive(async () => {
                 const arbitrationObj = await this.arbitrationService.getJSONDBData(`/arbitrationHash`);
-            //     const arbitrationObj = {}
-            // arbitrationObj['0xdb40d0d03eb95620ef1b5d5a4e01752069c081becd7d206d819a639774cad815'] = { status: 0 };
                 for (const hash in arbitrationObj) {
-                    if (arbitrationObj[hash] && arbitrationObj[hash].status) continue;
+                    if (arbitrationObj[hash] && !arbitrationObj[hash].isNeedProof) continue;
                     const url = `${process.env['ArbitrationHost']}/proof/${isMaker ? 'targetId' : 'sourceId'}/${hash}`;
                     const result: any = await HTTPGet(url);
-                    console.log(result, '=== syncProof result', url);
-                    const proofData: any = result?.data;
+                    logger.debug(`curl === ${url}`);
+                    const proofDataList: any[] = result?.data;
+                    if (!proofDataList.length) continue;
+                    logger.debug(`async proof: ${JSON.stringify(proofDataList)}`);
+                    const proofData = proofDataList.find(item=>item.status);
                     if (proofData) {
-                        if (!proofData.status) {
-                            logger.error(`async proof: ${JSON.stringify(proofData)}`);
-                            await this.arbitrationService.jsondb.push(`/arbitrationHash/${hash.toLowerCase()}`, {
-                                message: proofData.message,
-                                status: 1,
-                            });
-                            continue;
-                        }
                         if (!proofData?.proof) {
                             continue;
                         }
@@ -80,7 +72,7 @@ export class ArbitrationJobService {
                                     logger.debug('tx exist', item.sourceTxHash.toLowerCase());
                                     continue;
                                 }
-                                await this.arbitrationService.jsondb.push(`/arbitrationHash/${item.sourceTxHash.toLowerCase()}`, {});
+                                await this.arbitrationService.jsondb.push(`/arbitrationHash/${item.sourceTxHash.toLowerCase()}`, { isNeedProof: 0 });
                                 try {
                                     await this.arbitrationService.handleUserArbitration(item);
                                 } catch (error) {
@@ -123,7 +115,7 @@ export class ArbitrationJobService {
                         logger.debug('tx exist', hash);
                         continue;
                     }
-                    await this.arbitrationService.jsondb.push(`/arbitrationHash/${hash}`, { status: 0 });
+                    await this.arbitrationService.jsondb.push(`/arbitrationHash/${hash}`, { isNeedProof: 1 });
                     logger.info(`maker response arbitration ${hash}`);
                     await HTTPPost(`${process.env['ArbitrationHost']}/proof/makerAskProof`, {
                         hash
