@@ -105,16 +105,12 @@ export class ArbitrationJobService {
         if (mutex.isLocked()) {
             return;
         }
-        mutex
-            .runExclusive(async () => {
-                try {
-                    const account = await this.arbitrationService.getWallet();
-                    const res: any[] = <any[]>await HTTPGet(`${process.env['ArbitrationHost']}/proof/makerNeedResponseTxList?makerAddress=${account.address.toLowerCase()}`);
-                    for (const item of res) {
-                        if (!makerList.find(maker => maker.toLowerCase() === item.sourceMaker.toLowerCase())) {
-                            continue;
-                        }
-                        const hash = item.hash.toLowerCase();
+        mutex.runExclusive(async () => {
+            try {
+                for (const makerAddress of makerList) {
+                    const challengerList = await this.arbitrationService.getVerifyPassChallenger(makerAddress);
+                    for (const challenger of challengerList) {
+                        const hash = challenger.sourceTxHash.toLowerCase();
                         const data = await this.arbitrationService.getJSONDBData(`/arbitrationHash/${hash}`);
                         if (data) {
                             logger.debug('tx exist', hash);
@@ -126,9 +122,10 @@ export class ArbitrationJobService {
                             hash,
                         });
                     }
-                } catch (e) {
-                    console.error('makerArbitrationJob error', e);
                 }
-            });
+            } catch (e) {
+                console.error('makerArbitrationJob error', e);
+            }
+        });
     }
 }

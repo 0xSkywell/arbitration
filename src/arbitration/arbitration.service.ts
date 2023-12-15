@@ -129,6 +129,37 @@ export class ArbitrationService {
         return result?.data?.responseMakersSnapshot?.[0]?.responseMakerList || [];
     }
 
+    async getVerifyPassChallenger(owner: string) {
+        const queryStr = `
+                {
+                  challengeManagers (where:{
+                    owner:"${owner.toLowerCase()}"
+                  }){
+                    owner
+                    verifyPassChallenger
+                    challengeStatuses
+                    createChallenge {
+                      sourceTxHash
+                      isVerifyPass
+                    }
+                  }
+                }
+          `;
+        const result = await querySubgraph(queryStr);
+        const challengerList = result?.data?.challengeManagers;
+        if (!challengerList) return [];
+        const list = [];
+        for (const challenger of challengerList) {
+            if(challenger.challengeStatuses !== 'VERIFY_SOURCE')continue;
+            const verifyPassChallenger = challenger.verifyPassChallenger;
+            if (!challenger.createChallenge) continue;
+            const sourceTxHash = (challenger.createChallenge.find(item => item.isVerifyPass))?.sourceTxHash;
+            if (!sourceTxHash) continue;
+            list.push({ verifyPassChallenger, sourceTxHash });
+        }
+        return list;
+    }
+
     async getJSONDBData(dataPath) {
         try {
             return await this.jsondb.getData(dataPath);
