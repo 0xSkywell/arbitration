@@ -35,7 +35,7 @@ export interface VerifyChallengeDestParams {
     targetNonce: string;
     targetChain: string;
     targetToken: string;
-    targetAmount: string;
+    sourceAmount: string;
     challenger: string;
     spvAddress: string;
     sourceChain: string;

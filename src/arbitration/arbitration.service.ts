@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { JsonDB, Config } from 'node-json-db';
 import { utils, providers, ethers } from 'ethers';
 import MDCAbi from '../abi/MDC.abi.json';
+import EBCAbi from '../abi/EBC.abi.json';
 import {
     ArbitrationTransaction,
     VerifyChallengeDestParams,
@@ -112,7 +113,26 @@ export class ArbitrationService {
         return result?.data?.createChallenges?.[0]?.challengeNodeNumber;
     }
 
-    async getRuleKey(owner: string, ebcAddress: string, ruleId: string) {
+    async getRule(owner: string, ebcAddress: string, ruleId: string): Promise<{
+        chain0,
+        chain0CompensationRatio,
+        chain0ResponseTime,
+        chain0Status,
+        chain0Token,
+        chain0TradeFee,
+        chain0WithholdingFee,
+        chain0maxPrice,
+        chain0minPrice,
+        chain1,
+        chain1CompensationRatio,
+        chain1ResponseTime,
+        chain1Status,
+        chain1Token,
+        chain1TradeFee,
+        chain1WithholdingFee,
+        chain1maxPrice,
+        chain1minPrice
+    } | null> {
         const queryStr = `
         {
             mdcs(where: {owner: "${owner.toLowerCase()}"}) {
@@ -123,9 +143,23 @@ export class ArbitrationService {
                     first: 1
                   ) {
                     chain0
-                    chain1
+                    chain0CompensationRatio
+                    chain0ResponseTime
+                    chain0Status
                     chain0Token
+                    chain0TradeFee
+                    chain0WithholdingFee
+                    chain0maxPrice
+                    chain0minPrice
+                    chain1
+                    chain1CompensationRatio
+                    chain1ResponseTime
+                    chain1Status
                     chain1Token
+                    chain1TradeFee
+                    chain1WithholdingFee
+                    chain1maxPrice
+                    chain1minPrice
                   }
                 }
               }
@@ -135,6 +169,11 @@ export class ArbitrationService {
         const result = await querySubgraph(queryStr) || {};
         const rule = result?.data?.mdcs?.[0]?.ruleLatest?.[0]?.ruleUpdateRel?.[0]?.ruleUpdateVersion?.[0];
         console.log('rule ===', rule);
+        return rule;
+    }
+
+    async getRuleKey(owner: string, ebcAddress: string, ruleId: string) {
+        const rule = await this.getRule(owner, ebcAddress, ruleId);
         if (!rule) return null;
         return keccak256(utils.defaultAbiCoder.encode(
             ['uint256', 'uint256', 'uint256', 'uint256'],
@@ -143,33 +182,12 @@ export class ArbitrationService {
     }
 
     async getResponseTime(owner: string, ebcAddress: string, ruleId: string, sourceChain: string, destChain: string) {
-        const queryStr = `
-        {
-            mdcs(where: {owner: "${owner.toLowerCase()}"}) {
-              ruleLatest(where: {ebcAddr: "${ebcAddress.toLowerCase()}"}) {
-                ruleUpdateRel {
-                  ruleUpdateVersion(
-                    where: {id: "${ruleId.toLowerCase()}", ruleValidation: true}
-                    first: 1
-                  ) {
-                    chain0
-                    chain1
-                    chain0ResponseTime
-                    chain1ResponseTime
-                  }
-                }
-              }
-            }
-          }
-          `;
-        const result = await querySubgraph(queryStr) || {};
-        const rule = result?.data?.mdcs?.[0]?.ruleLatest?.[0]?.ruleUpdateRel?.[0]?.ruleUpdateVersion?.[0];
-        console.log('rule ===', rule);
+        const rule = await this.getRule(owner, ebcAddress, ruleId);
         if (!rule) return null;
-        if (rule.chain0 === sourceChain && rule.chain1 === destChain) {
+        if (+rule.chain0 === +sourceChain && +rule.chain1 === +destChain) {
             return rule.chain0ResponseTime;
         }
-        if (rule.chain0 === destChain && rule.chain1 === sourceChain) {
+        if (+rule.chain0 === +destChain && +rule.chain1 === +sourceChain) {
             return rule.chain1ResponseTime;
         }
         return null;
@@ -222,6 +240,52 @@ export class ArbitrationService {
             list.push({ verifyPassChallenger, sourceTxHash });
         }
         return list;
+    }
+
+    async getEBCValue(owner: string, ebcAddress: string, ruleId: string, sourceChain: string, destChain: string, amount: string) {
+        const provider = new providers.JsonRpcProvider({
+            url: process.env['ArbitrationRPC'],
+        });
+        const contractInstance = new ethers.Contract(
+            ebcAddress,
+            EBCAbi,
+            provider,
+        );
+        const rule = await this.getRule(owner, ebcAddress, ruleId);
+        if (!rule) return null;
+        let ro;
+        if (+rule.chain0 === +sourceChain && +rule.chain1 === +destChain) {
+            ro = [
+                rule.chain0,
+                rule.chain1,
+                rule.chain0Status,
+                rule.chain0Token,
+                rule.chain1Token,
+                rule.chain0minPrice,
+                rule.chain0maxPrice,
+                rule.chain0WithholdingFee,
+                rule.chain0TradeFee,
+                rule.chain0ResponseTime,
+                rule.chain0CompensationRatio,
+            ];
+        } else if (+rule.chain0 === +destChain && +rule.chain1 === +sourceChain) {
+            ro = [
+                rule.chain1,
+                rule.chain0,
+                rule.chain1Status,
+                rule.chain1Token,
+                rule.chain0Token,
+                rule.chain1minPrice,
+                rule.chain1maxPrice,
+                rule.chain1WithholdingFee,
+                rule.chain1TradeFee,
+                rule.chain1ResponseTime,
+                rule.chain1CompensationRatio,
+            ];
+        } else {
+            return null;
+        }
+        return await contractInstance.getResponseIntent(ethers.BigNumber.from(amount), ro);
     }
 
     async getJSONDBData(dataPath) {
@@ -413,6 +477,7 @@ export class ArbitrationService {
             throw new Error('ChainRels not found');
         }
         const responseMakerList = await this.getResponseMakerList(txData.sourceTime);
+        console.log('responseMakerList', responseMakerList);
         const rawDatas = utils.defaultAbiCoder.encode(
             ['uint256[]'],
             [responseMakerList.map(item => ethers.BigNumber.from(item))],
@@ -425,14 +490,19 @@ export class ArbitrationService {
         if (!responseTime) {
             logger.error(`nonce of responseTime, ${JSON.stringify(txData)}`);
         }
+        const destAmount = this.getEBCValue(txData.sourceMaker, txData.ebcAddress, txData.ruleId, txData.sourceChain, txData.targetChain, txData.sourceAmount);
+        if (!destAmount) {
+            logger.error(`nonce of destAmount, ${JSON.stringify(txData)}`);
+        }
+        console.log('destAmount', String(destAmount));
         const verifiedSourceTxData = {
             minChallengeSecond: +chain.minVerifyChallengeSourceTxSecond,
             maxChallengeSecond: +chain.maxVerifyChallengeSourceTxSecond,
-            nonce: ethers.BigNumber.from(txData.sourceNonce),
-            destChainId: ethers.BigNumber.from(txData.targetChain),
-            from: ethers.BigNumber.from(txData.sourceAddress),
-            destToken: ethers.BigNumber.from(txData.targetToken),
-            destAmount: ethers.BigNumber.from(txData.targetAmount),
+            nonce: ethers.BigNumber.from(+txData.sourceNonce),
+            destChainId: ethers.BigNumber.from(+txData.targetChain),
+            from: ethers.BigNumber.from(+txData.sourceAddress),
+            destToken: ethers.BigNumber.from(+txData.targetToken),
+            destAmount: ethers.BigNumber.from(destAmount),
             responseMakersHash: ethers.BigNumber.from(responseMakersHash),
             responseTime: ethers.BigNumber.from(responseTime),
         };
