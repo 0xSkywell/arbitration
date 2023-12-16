@@ -1,4 +1,6 @@
 export interface ArbitrationTransaction {
+    ebcAddress: string;
+    ruleId: string;
     sourceMaker: string;
     sourceTxTime: number;
     sourceChainId: number;

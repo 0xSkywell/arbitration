@@ -111,6 +111,36 @@ export class ArbitrationService {
         return result?.data?.createChallenges?.[0]?.challengeNodeNumber;
     }
 
+    async getRuleKey(owner: string, ebcAddress: string, ruleId: string) {
+        const queryStr = `
+        {
+            mdcs(where: {owner: "${owner.toLowerCase()}"}) {
+              ruleLatest(where: {ebcAddr: "${ebcAddress.toLowerCase()}"}) {
+                ruleUpdateRel {
+                  ruleUpdateVersion(
+                    where: {id: "${ruleId.toLowerCase()}", ruleValidation: true}
+                    first: 1
+                  ) {
+                    chain0
+                    chain1
+                    chain0Token
+                    chain1Token
+                  }
+                }
+              }
+            }
+          }
+          `;
+        const result = await querySubgraph(queryStr) || {};
+        const rule = result?.data?.mdcs?.[0]?.ruleLatest?.[0]?.ruleUpdateRel?.[0]?.ruleUpdateVersion?.[0];
+        console.log('rule ===', rule);
+        if (!rule) return null;
+        return utils.defaultAbiCoder.encode(
+            ['uint256', 'uint256', 'uint256', 'uint256'],
+            [rule.chain0, rule.chain1, rule.chain0Token, rule.chain1Token].map(item => ethers.BigNumber.from(item)),
+        );
+    }
+
     async getResponseMakerList(sourceTime: string) {
         const queryStr = `
             {
@@ -266,14 +296,18 @@ export class ArbitrationService {
     async handleUserArbitration(tx: ArbitrationTransaction) {
         logger.info(`handleUserArbitration begin ${tx.sourceTxHash}`);
         const ifa = new ethers.utils.Interface(MDCAbi);
-        const account = await this.getWallet();
         const mdcAddress = await this.getMDCAddress(tx.sourceMaker);
         const newChallengeNodeNumber = utils.defaultAbiCoder.encode(
             ['uint64', 'uint64', 'uint64', 'uint64'],
             [+tx.sourceTxTime, +tx.sourceChainId, +tx.sourceTxBlockNum, +tx.sourceTxIndex],
         );
         const parentNodeNumOfTargetNode = await this.getChallengeNodeNumber(tx.sourceMaker, mdcAddress, newChallengeNodeNumber);
-        console.log('parentNodeNumOfTargetNode',parentNodeNumOfTargetNode)
+        console.log('parentNodeNumOfTargetNode', parentNodeNumOfTargetNode);
+        const ruleKey = await this.getRuleKey(tx.sourceMaker, tx.ebcAddress, tx.ruleId);
+        if (!ruleKey) {
+            logger.error(`none of ruleKey: owner: ${tx.sourceMaker}`);
+            return;
+        }
         // Obtaining arbitration deposit
         const encodeData = [
             +tx.sourceTxTime,
@@ -281,7 +315,7 @@ export class ArbitrationService {
             +tx.sourceTxBlockNum,
             +tx.sourceTxIndex,
             tx.sourceTxHash,
-            tx.ruleKey,
+            ruleKey,
             tx.freezeToken,
             ethers.BigNumber.from(tx.freezeAmount1).toNumber(),
             ethers.BigNumber.from(parentNodeNumOfTargetNode || 0),
@@ -378,6 +412,7 @@ export class ArbitrationService {
         logger.debug(`MakerSubmitProof tx: ${JSON.stringify(response)}`);
         await this.jsondb.push(`/arbitrationHash/${txData.sourceId}`, {
             verifyChallengeDestHash: response.hash,
+            challenger: txData.challenger,
             isNeedProof: 0
         });
         logger.info(`makerSubmitProof end sourceId: ${txData.sourceId} verifyChallengeDestHash: ${response.hash}`);
