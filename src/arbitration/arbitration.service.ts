@@ -267,7 +267,7 @@ export class ArbitrationService {
                 rule.chain0TradeFee,
                 rule.chain0ResponseTime,
                 rule.chain0CompensationRatio,
-            ];
+            ].map(item=>ethers.BigNumber.from(item));
         } else if (+rule.chain0 === +destChain && +rule.chain1 === +sourceChain) {
             ro = [
                 rule.chain1,
@@ -281,7 +281,7 @@ export class ArbitrationService {
                 rule.chain1TradeFee,
                 rule.chain1ResponseTime,
                 rule.chain1CompensationRatio,
-            ];
+            ].map(item=>ethers.BigNumber.from(item));
         } else {
             return null;
         }
