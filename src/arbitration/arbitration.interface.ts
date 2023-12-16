@@ -26,6 +26,8 @@ export interface VerifyChallengeSourceParams {
 }
 
 export interface VerifyChallengeDestParams {
+    ebcAddress: string;
+    ruleId: string;
     sourceMaker: string;
     sourceTime: string;
     sourceAddress: string;

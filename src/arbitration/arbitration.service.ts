@@ -142,6 +142,39 @@ export class ArbitrationService {
         ));
     }
 
+    async getResponseTime(owner: string, ebcAddress: string, ruleId: string, sourceChain: string, destChain: string) {
+        const queryStr = `
+        {
+            mdcs(where: {owner: "${owner.toLowerCase()}"}) {
+              ruleLatest(where: {ebcAddr: "${ebcAddress.toLowerCase()}"}) {
+                ruleUpdateRel {
+                  ruleUpdateVersion(
+                    where: {id: "${ruleId.toLowerCase()}", ruleValidation: true}
+                    first: 1
+                  ) {
+                    chain0
+                    chain1
+                    chain0ResponseTime
+                    chain1ResponseTime
+                  }
+                }
+              }
+            }
+          }
+          `;
+        const result = await querySubgraph(queryStr) || {};
+        const rule = result?.data?.mdcs?.[0]?.ruleLatest?.[0]?.ruleUpdateRel?.[0]?.ruleUpdateVersion?.[0];
+        console.log('rule ===', rule);
+        if (!rule) return null;
+        if (rule.chain0 === sourceChain && rule.chain1 === destChain) {
+            return rule.chain0ResponseTime;
+        }
+        if (rule.chain0 === destChain && rule.chain1 === sourceChain) {
+            return rule.chain1ResponseTime;
+        }
+        return null;
+    }
+
     async getResponseMakerList(sourceTime: string) {
         const queryStr = `
             {
@@ -384,9 +417,14 @@ export class ArbitrationService {
             ['uint256[]'],
             [responseMakerList.map(item => ethers.BigNumber.from(item))],
         );
-        const responseMakersHash = utils.keccak256(rawDatas);
-        const responseTime = txData.sourceTime;
-
+        const responseMakersHash = utils.keccak256(utils.defaultAbiCoder.encode(
+            ['uint256[]'],
+            [responseMakerList.map(item => ethers.BigNumber.from(item))],
+        ));
+        const responseTime = await this.getResponseTime(txData.sourceMaker, txData.ebcAddress, txData.ruleId, txData.sourceChain, txData.targetChain);
+        if (!responseTime) {
+            logger.error(`nonce of responseTime, ${JSON.stringify(txData)}`);
+        }
         const verifiedSourceTxData = {
             minChallengeSecond: ethers.BigNumber.from(chain.minVerifyChallengeSourceTxSecond),
             maxChallengeSecond: ethers.BigNumber.from(chain.maxVerifyChallengeSourceTxSecond),
