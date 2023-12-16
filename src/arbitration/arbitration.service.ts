@@ -387,17 +387,17 @@ export class ArbitrationService {
         const responseMakersHash = utils.keccak256(rawDatas);
         const responseTime = txData.sourceTime;
 
-        const verifiedSourceTxData = [
-            ethers.BigNumber.from(chain.minVerifyChallengeSourceTxSecond),
-            ethers.BigNumber.from(chain.maxVerifyChallengeSourceTxSecond),
-            ethers.BigNumber.from(txData.sourceNonce),
-            ethers.BigNumber.from(txData.targetChain),
-            ethers.BigNumber.from(txData.sourceAddress),
-            ethers.BigNumber.from(txData.targetToken),
-            ethers.BigNumber.from(txData.targetAmount),
-            ethers.BigNumber.from(responseMakersHash),
-            ethers.BigNumber.from(responseTime),
-        ];
+        const verifiedSourceTxData = {
+            minChallengeSecond: ethers.BigNumber.from(chain.minVerifyChallengeSourceTxSecond),
+            maxChallengeSecond: ethers.BigNumber.from(chain.maxVerifyChallengeSourceTxSecond),
+            nonce: ethers.BigNumber.from(txData.sourceNonce),
+            destChainId: ethers.BigNumber.from(txData.targetChain),
+            from: ethers.BigNumber.from(txData.sourceAddress),
+            destToken: ethers.BigNumber.from(txData.targetToken),
+            destAmount: ethers.BigNumber.from(txData.targetAmount),
+            responseMakersHash: ethers.BigNumber.from(responseMakersHash),
+            responseTime: ethers.BigNumber.from(responseTime),
+        };
         const encodeData = [
             txData.challenger,
             txData.spvAddress,
