@@ -31,6 +31,7 @@ export interface VerifyChallengeDestParams {
     sourceMaker: string;
     sourceTime: string;
     sourceAddress: string;
+    sourceNonce: string;
     targetNonce: string;
     targetChain: string;
     targetToken: string;
