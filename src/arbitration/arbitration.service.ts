@@ -490,7 +490,7 @@ export class ArbitrationService {
         if (!responseTime) {
             logger.error(`nonce of responseTime, ${JSON.stringify(txData)}`);
         }
-        const destAmount = this.getEBCValue(txData.sourceMaker, txData.ebcAddress, txData.ruleId, txData.sourceChain, txData.targetChain, txData.sourceAmount);
+        const destAmount = await this.getEBCValue(txData.sourceMaker, txData.ebcAddress, txData.ruleId, txData.sourceChain, txData.targetChain, txData.sourceAmount);
         if (!destAmount) {
             logger.error(`nonce of destAmount, ${JSON.stringify(txData)}`);
         }
