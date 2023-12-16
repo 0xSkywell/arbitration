@@ -396,7 +396,7 @@ export class ArbitrationService {
             ethers.BigNumber.from(txData.targetToken),
             ethers.BigNumber.from(txData.targetAmount),
             ethers.BigNumber.from(responseMakersHash),
-            responseTime,
+            ethers.BigNumber.from(responseTime),
         ];
         const encodeData = [
             txData.challenger,
