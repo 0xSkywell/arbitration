@@ -497,13 +497,13 @@ export class ArbitrationService {
         }
         console.log('destAmount', String(destAmount));
         const verifiedSourceTxData = {
-            minChallengeSecond: +chain.minVerifyChallengeSourceTxSecond,
-            maxChallengeSecond: +chain.maxVerifyChallengeSourceTxSecond,
-            nonce: ethers.BigNumber.from(+txData.sourceNonce),
-            destChainId: ethers.BigNumber.from(+txData.targetChain),
-            from: ethers.BigNumber.from(+txData.sourceAddress),
-            destToken: ethers.BigNumber.from(+txData.targetToken),
-            destAmount: ethers.BigNumber.from(+destAmount),
+            minChallengeSecond: ethers.BigNumber.from(chain.minVerifyChallengeSourceTxSecond),
+            maxChallengeSecond: ethers.BigNumber.from(chain.maxVerifyChallengeSourceTxSecond),
+            nonce: ethers.BigNumber.from(txData.sourceNonce),
+            destChainId: ethers.BigNumber.from(txData.targetChain),
+            from: ethers.BigNumber.from(txData.sourceAddress),
+            destToken: ethers.BigNumber.from(txData.targetToken),
+            destAmount: ethers.BigNumber.from(destAmount),
             responseMakersHash: ethers.BigNumber.from(responseMakersHash),
             responseTime: ethers.BigNumber.from(responseTime),
         };
