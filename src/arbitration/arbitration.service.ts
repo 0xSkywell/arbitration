@@ -7,10 +7,11 @@ import {
     VerifyChallengeDestParams,
     VerifyChallengeSourceParams,
 } from './arbitration.interface';
-import { HTTPPost, querySubgraph } from '../utils';
+import { querySubgraph } from '../utils';
 import Keyv from 'keyv';
 import BigNumber from 'bignumber.js';
 import logger from '../utils/logger';
+import { keccak256 } from "@ethersproject/keccak256";
 
 const keyv = new Keyv();
 
@@ -135,10 +136,10 @@ export class ArbitrationService {
         const rule = result?.data?.mdcs?.[0]?.ruleLatest?.[0]?.ruleUpdateRel?.[0]?.ruleUpdateVersion?.[0];
         console.log('rule ===', rule);
         if (!rule) return null;
-        return utils.defaultAbiCoder.encode(
+        return keccak256(utils.defaultAbiCoder.encode(
             ['uint256', 'uint256', 'uint256', 'uint256'],
-            [+rule.chain0, +rule.chain1, +rule.chain0Token, +rule.chain1Token],
-        );
+            [+rule.chain0, +rule.chain1, +rule.chain0Token, +rule.chain1Token].map(item => ethers.BigNumber.from(item)),
+        ));
     }
 
     async getResponseMakerList(sourceTime: string) {
