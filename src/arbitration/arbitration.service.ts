@@ -285,6 +285,7 @@ export class ArbitrationService {
         } else {
             return null;
         }
+        console.log('amount', amount, 'ro', ro);
         return await contractInstance.getResponseIntent(ethers.BigNumber.from(amount), ro);
     }
 
