@@ -137,7 +137,7 @@ export class ArbitrationService {
         if (!rule) return null;
         return utils.defaultAbiCoder.encode(
             ['uint256', 'uint256', 'uint256', 'uint256'],
-            [rule.chain0, rule.chain1, rule.chain0Token, rule.chain1Token].map(item => ethers.BigNumber.from(item)),
+            [+rule.chain0, +rule.chain1, +rule.chain0Token, +rule.chain1Token],
         );
     }
 
