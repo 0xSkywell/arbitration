@@ -168,7 +168,7 @@ export class ArbitrationService {
           `;
         const result = await querySubgraph(queryStr) || {};
         const rule = result?.data?.mdcs?.[0]?.ruleLatest?.[0]?.ruleUpdateRel?.[0]?.ruleUpdateVersion?.[0];
-        console.log('rule ===', rule);
+        logger.debug('rule ===', rule);
         return rule;
     }
 
@@ -208,7 +208,7 @@ export class ArbitrationService {
             }
           `;
         const result = await querySubgraph(queryStr);
-        return result?.data?.responseMakersSnapshot?.[0]?.responseMakerList || [];
+        return result?.data?.mdcs?.[0]?.responseMakersSnapshot?.[0]?.responseMakerList || [];
     }
 
     async getVerifyPassChallenger(owner: string) {
@@ -285,7 +285,7 @@ export class ArbitrationService {
         } else {
             return null;
         }
-        console.log('amount', amount, 'ro', ro);
+        logger.debug('getEBCValue amount', amount, 'ro', ro);
         return await contractInstance.getResponseIntent(ethers.BigNumber.from(amount), ro);
     }
 
@@ -401,7 +401,7 @@ export class ArbitrationService {
             [+tx.sourceTxTime, +tx.sourceChainId, +tx.sourceTxBlockNum, +tx.sourceTxIndex],
         );
         const parentNodeNumOfTargetNode = await this.getChallengeNodeNumber(tx.sourceMaker, mdcAddress, newChallengeNodeNumber);
-        console.log('parentNodeNumOfTargetNode', parentNodeNumOfTargetNode);
+        logger.debug('parentNodeNumOfTargetNode', parentNodeNumOfTargetNode);
         const ruleKey = await this.getRuleKey(tx.sourceMaker, tx.ebcAddress, tx.ruleId);
         if (!ruleKey) {
             logger.error(`none of ruleKey: owner: ${tx.sourceMaker}`);
@@ -478,15 +478,12 @@ export class ArbitrationService {
             throw new Error('ChainRels not found');
         }
         const responseMakerList = await this.getResponseMakerList(txData.sourceTime);
-        console.log('responseMakerList', responseMakerList);
+        logger.debug('responseMakerList', responseMakerList);
         const rawDatas = utils.defaultAbiCoder.encode(
             ['uint256[]'],
             [responseMakerList.map(item => ethers.BigNumber.from(item))],
         );
-        const responseMakersHash = utils.keccak256(utils.defaultAbiCoder.encode(
-            ['uint256[]'],
-            [responseMakerList.map(item => ethers.BigNumber.from(item))],
-        ));
+        const responseMakersHash = utils.keccak256(rawDatas);
         const responseTime = await this.getResponseTime(txData.sourceMaker, txData.ebcAddress, txData.ruleId, txData.sourceChain, txData.targetChain);
         if (!responseTime) {
             logger.error(`nonce of responseTime, ${JSON.stringify(txData)}`);
@@ -495,7 +492,6 @@ export class ArbitrationService {
         if (!destAmount) {
             logger.error(`nonce of destAmount, ${JSON.stringify(txData)}`);
         }
-        console.log('destAmount', String(destAmount));
         const verifiedSourceTxData = {
             minChallengeSecond: ethers.BigNumber.from(chain.minVerifyChallengeSourceTxSecond),
             maxChallengeSecond: ethers.BigNumber.from(chain.maxVerifyChallengeSourceTxSecond),
@@ -507,7 +503,7 @@ export class ArbitrationService {
             responseMakersHash: ethers.BigNumber.from(responseMakersHash),
             responseTime: ethers.BigNumber.from(responseTime),
         };
-        console.log('verifiedSourceTxData', verifiedSourceTxData);
+        logger.debug('verifiedSourceTxData', verifiedSourceTxData);
         // const verifiedSourceTxData = [
         //     ethers.BigNumber.from(chain.minVerifyChallengeSourceTxSecond),
         //     ethers.BigNumber.from(chain.maxVerifyChallengeSourceTxSecond),
