@@ -213,6 +213,29 @@ export class ArbitrationService {
         return result?.data?.mdcs?.[0]?.responseMakersSnapshot?.[0]?.responseMakerList || [];
     }
 
+    async getColumnArray(txTimestamp: string | number, mdcAddress: string, owner: string) {
+        const queryStr = `
+   {
+        columnArraySnapshots(
+            where: {
+                enableTimestamp_lt: "${txTimestamp}",
+                mdc_: {
+                    id: "${mdcAddress.toLowerCase()}"
+                    owner: "${owner.toLowerCase()}"
+                }
+            }
+            first: 1
+        ) {
+            dealers
+            ebcs
+            chainIds
+        }
+    }
+          `;
+        const result = await querySubgraph(queryStr);
+        return result?.data?.columnArraySnapshots?.[0];
+    }
+
     async getVerifyPassChallenger(owner: string) {
         const queryStr = `
                 {
@@ -448,14 +471,58 @@ export class ArbitrationService {
         logger.info(`userSubmitProof begin ${txData.hash}`);
         const wallet = await this.getWallet();
         const mdcAddress = await this.getMDCAddress(txData.sourceMaker);
+        if (!mdcAddress) {
+            logger.error(`nonce of mdcAddress, ${JSON.stringify(txData)}`);
+            return;
+        }
+        const columnArray = await this.getColumnArray(txData.sourceTime, mdcAddress, txData.sourceMaker);
+        if (!columnArray?.dealers) {
+            logger.error(`nonce of columnArray, ${JSON.stringify(txData)}`);
+            return;
+        }
+        const { dealers, ebcs, chainIds } = columnArray;
+        const ebc = txData.ebcAddress;
+        const rawDatas = utils.defaultAbiCoder.encode(
+            ['address[]', 'address[]', 'uint64[]', 'address'],
+            [dealers, ebcs, chainIds, ebc],
+        );
+        const rule: any = await this.getRule(txData.sourceMaker, txData.ebcAddress, txData.ruleId);
+        if (!rule?.chain0) {
+            logger.error(`nonce of rule, ${JSON.stringify(txData)}`);
+            return;
+        }
+        const formatRule: any[] = [
+            rule.chain0,
+            rule.chain1,
+            rule.chain0Status,
+            rule.chain1Status,
+            rule.chain0Token,
+            rule.chain1Token,
+            rule.chain0minPrice,
+            rule.chain1minPrice,
+            rule.chain0maxPrice,
+            rule.chain1maxPrice,
+            rule.chain0WithholdingFee,
+            rule.chain1WithholdingFee,
+            rule.chain0TradeFee,
+            rule.chain1TradeFee,
+            rule.chain0ResponseTime,
+            rule.chain1ResponseTime,
+            rule.chain0CompensationRatio,
+            rule.chain1CompensationRatio,
+        ];
+        const rlpRuleBytes = utils.RLP.encode(
+            formatRule.map((r) => utils.stripZeros(ethers.BigNumber.from(r).toHexString())),
+        );
+
         const ifa = new ethers.utils.Interface(MDCAbi);
         const encodeData = [
             wallet.address,
             txData.spvAddress,
             +txData.sourceChain,
             txData.proof,
-            txData.rawDatas,
-            txData.rlpRuleBytes
+            rawDatas,
+            rlpRuleBytes
         ];
         logger.debug(`encodeData: ${JSON.stringify(encodeData)}`);
         const data = ifa.encodeFunctionData('verifyChallengeSource', encodeData);
@@ -480,7 +547,8 @@ export class ArbitrationService {
         const mdcAddress = await this.getMDCAddress(txData.sourceMaker);
         const chain = chainRels.find(c => +c.id === +txData.sourceChain);
         if (!chain) {
-            throw new Error('ChainRels not found');
+            logger.error(`nonce of chainRels, ${JSON.stringify(txData)}`);
+            return;
         }
         const responseMakerList = await this.getResponseMakerList(txData.sourceTime);
         logger.debug('responseMakerList', responseMakerList);
@@ -492,10 +560,12 @@ export class ArbitrationService {
         const responseTime = await this.getResponseTime(txData.sourceMaker, txData.ebcAddress, txData.ruleId, txData.sourceChain, txData.targetChain);
         if (!responseTime) {
             logger.error(`nonce of responseTime, ${JSON.stringify(txData)}`);
+            return;
         }
         const destAmount = await this.getEBCValue(txData.sourceMaker, txData.ebcAddress, txData.ruleId, txData.sourceChain, txData.targetChain, txData.sourceAmount);
         if (!destAmount) {
             logger.error(`nonce of destAmount, ${JSON.stringify(txData)}`);
+            return;
         }
         const verifiedSourceTxData = {
             minChallengeSecond: ethers.BigNumber.from(chain.minVerifyChallengeSourceTxSecond),

@@ -17,12 +17,13 @@ export interface ArbitrationTransaction {
 
 export interface VerifyChallengeSourceParams {
     hash: string;
+    sourceTime: string;
     sourceMaker: string;
+    ruleId: string;
     spvAddress: string;
+    ebcAddress: string;
     sourceChain: string;
     proof: string;
-    rawDatas: string;
-    rlpRuleBytes: string;
 }
 
 export interface VerifyChallengeDestParams {
