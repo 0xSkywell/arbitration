@@ -1,4 +1,5 @@
 import axios from "axios";
+import logger from './logger';
 
 export async function HTTPGet(
   url: string,
@@ -28,5 +29,6 @@ export async function querySubgraph(query: string) {
     if (!subgraphEndpoint) {
         throw new Error('SubgraphEndpoint not found');
     }
+    logger.debug('query', query);
     return HTTPPost(subgraphEndpoint, { query });
 }

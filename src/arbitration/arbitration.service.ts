@@ -432,7 +432,7 @@ export class ArbitrationService {
         logger.debug('parentNodeNumOfTargetNode', parentNodeNumOfTargetNode);
         const ruleKey = await this.getRuleKey(tx.sourceMaker, tx.ebcAddress, tx.ruleId);
         if (!ruleKey) {
-            logger.error(`none of ruleKey: owner: ${tx.sourceMaker}`);
+            logger.error(`none of ruleKey, owner: ${tx.sourceMaker} ebcAddress: ${tx.ebcAddress} ruleId: ${tx.ruleId}`);
             return;
         }
         // Obtaining arbitration deposit
