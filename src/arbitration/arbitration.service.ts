@@ -14,6 +14,8 @@ import BigNumber from 'bignumber.js';
 import logger from '../utils/logger';
 import { keccak256 } from "@ethersproject/keccak256";
 
+let accountNonce = 0;
+
 const keyv = new Keyv();
 
 export interface ChainRel {
@@ -372,13 +374,14 @@ export class ArbitrationService {
     async send(to, value, data) {
         const account = await this.getWallet();
         const chainId = await account.getChainId();
+        const nonce = Math.max(await account.getTransactionCount('pending'), accountNonce);
         const transactionRequest = {
             chainId,
             data,
             to,
             value,
             from: account.address,
-            nonce: await account.getTransactionCount('pending'),
+            nonce,
         };
 
         const provider = new providers.JsonRpcProvider({
@@ -389,7 +392,9 @@ export class ArbitrationService {
         const signedTx = await account.signTransaction(transactionRequest);
         const txHash = utils.keccak256(signedTx);
         logger.info(`txHash: ${txHash}`);
-        return await provider.sendTransaction(signedTx);
+        const response = await provider.sendTransaction(signedTx);
+        accountNonce = nonce + 1;
+        return response;
     }
 
     async handleUserArbitration(tx: ArbitrationTransaction) {
