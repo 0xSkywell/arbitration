@@ -68,9 +68,12 @@ export class ArbitrationJobService {
         mutex.runExclusive(async () => {
             try {
                 const endTime = new Date().valueOf();
-                const res: any = await HTTPGet(`${process.env['ArbitrationHost']}/transaction/unreimbursedTransactions?startTime=${startTime - 1000 * 60 * 60}&endTime=${endTime}`);
+                const url = `${process.env['ArbitrationHost']}/transaction/unreimbursedTransactions?startTime=${startTime - 1000 * 60 * 60}&endTime=${endTime}`;
+                const res: any = await HTTPGet(url);
+                logger.debug('curl', url);
                 if (res?.data) {
                     const list: ArbitrationTransaction[] = res.data;
+                    logger.debug('list count', list.length);
                     for (const item of list) {
                         const result = await this.arbitrationService.verifyArbitrationConditions(item);
                         if (result) {
