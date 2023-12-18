@@ -169,9 +169,12 @@ export class ArbitrationService {
           }
           `;
         const result = await querySubgraph(queryStr) || {};
-        const rule = result?.data?.mdcs?.[0]?.ruleLatest?.[0]?.ruleUpdateRel?.[0]?.ruleUpdateVersion?.[0];
-        logger.debug('rule ===', rule);
-        return rule;
+        for (const ruleLatest of result?.data?.mdcs?.[0]?.ruleLatest) {
+            if (ruleLatest?.ruleUpdateRel?.[0]?.ruleUpdateVersion.length) {
+                return ruleLatest?.ruleUpdateRel?.[0]?.ruleUpdateVersion?.[0];
+            }
+        }
+        return null;
     }
 
     async getRuleKey(owner: string, ebcAddress: string, ruleId: string) {
