@@ -400,7 +400,7 @@ export class ArbitrationService {
 
         const balance = await provider.getBalance(transactionRequest.from);
         if (new BigNumber(String(balance)).lt(gasFee)) {
-            logger.error(`Insufficient Balance: ${String(balance)} < ${String(gasFee)}`);
+            logger.error(`${transactionRequest.from} Insufficient Balance: ${String(balance)} < ${String(gasFee)}`);
             throw new Error('Insufficient Balance');
         }
 
