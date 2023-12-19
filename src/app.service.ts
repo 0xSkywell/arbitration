@@ -1,14 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { ethers, providers } from 'ethers';
-import { ArbitrationService } from './arbitration/arbitration.service';
 import { aesEncrypt, HTTPGet } from './utils';
 import logger from './utils/logger';
+import { arbitrationConfig, configdb } from './utils/config';
 
 @Injectable()
 export class AppService {
-    constructor(private arbitrationService: ArbitrationService) {
-    }
-
     async setConfig(configParams: any) {
         const { privateKey, secretKey, rpc, makerApiEndpoint, makerList, gasLimit, maxFeePerGas, maxPriorityFeePerGas } = configParams;
         if (rpc) {
@@ -23,54 +20,54 @@ export class AppService {
             } catch (e) {
                 return { code: 1, message: 'Rpc error' };
             }
-            this.arbitrationService.config.rpc = rpc;
+            arbitrationConfig.rpc = rpc;
         }
         if (privateKey) {
-            if (this.arbitrationService.config.rpc) {
+            if (arbitrationConfig.rpc) {
                 try {
                     const provider = new providers.JsonRpcProvider({
-                        url: this.arbitrationService.config.rpc,
+                        url: arbitrationConfig.rpc,
                     });
                     const wallet = new ethers.Wallet(privateKey).connect(provider);
                     const address = await wallet.getAddress();
                     console.log(`Inject the ${address} wallet private key`);
-                    this.arbitrationService.config.secretKey = secretKey ?? this.arbitrationService.config.secretKey;
-                    this.arbitrationService.config.privateKey = privateKey;
+                    arbitrationConfig.secretKey = secretKey ?? arbitrationConfig.secretKey;
+                    arbitrationConfig.privateKey = privateKey;
                 } catch (e) {
                     return { code: 1, message: 'PrivateKey error' };
                 }
             }
         }
         if (makerList) {
-            this.arbitrationService.config.makerList = makerList;
+            arbitrationConfig.makerList = makerList;
         }
         if (gasLimit) {
-            this.arbitrationService.config.gasLimit = gasLimit;
+            arbitrationConfig.gasLimit = gasLimit;
         }
         if (maxFeePerGas) {
-            this.arbitrationService.config.maxFeePerGas = maxFeePerGas;
+            arbitrationConfig.maxFeePerGas = maxFeePerGas;
         }
         if (maxPriorityFeePerGas) {
-            this.arbitrationService.config.maxPriorityFeePerGas = maxPriorityFeePerGas;
+            arbitrationConfig.maxPriorityFeePerGas = maxPriorityFeePerGas;
         }
         if (makerApiEndpoint) {
-            this.arbitrationService.config.makerApiEndpoint = makerApiEndpoint;
+            arbitrationConfig.makerApiEndpoint = makerApiEndpoint;
             try {
                 const arbitrationConfig = await HTTPGet(`${makerApiEndpoint}/config/arbitration-client`);
                 if (arbitrationConfig?.data?.subgraphEndpoint) {
-                    this.arbitrationService.config.subgraphEndpoint = arbitrationConfig.data.subgraphEndpoint;
+                    arbitrationConfig.subgraphEndpoint = arbitrationConfig.data.subgraphEndpoint;
                 }
             } catch (e) {
                 logger.error(`request fail: ${makerApiEndpoint}/config/arbitration-client`, e);
             }
         }
-        const config = JSON.parse(JSON.stringify(this.arbitrationService.config));
+        const config = JSON.parse(JSON.stringify(arbitrationConfig));
         delete config.privateKey;
         if (privateKey) {
             config.encryptPrivateKey = aesEncrypt(privateKey, config.secretKey ?? '');
         }
-        console.log('this.arbitrationService.config', this.arbitrationService.config);
-        await this.arbitrationService.configdb.push('/local', config);
+        console.log('arbitrationConfig', arbitrationConfig);
+        await configdb.push('/local', config);
         return { code: 0, message: 'success', result: config };
     }
 }

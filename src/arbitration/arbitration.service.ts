@@ -8,11 +8,12 @@ import {
     VerifyChallengeDestParams,
     VerifyChallengeSourceParams,
 } from './arbitration.interface';
-import { aesDecrypt, HTTPPost } from '../utils';
+import { HTTPPost } from '../utils';
 import Keyv from 'keyv';
 import BigNumber from 'bignumber.js';
 import logger from '../utils/logger';
 import { keccak256 } from "@ethersproject/keccak256";
+import { arbitrationConfig } from '../utils/config';
 
 let accountNonce = 0;
 
@@ -36,28 +37,9 @@ export interface ChainRel {
 @Injectable()
 export class ArbitrationService {
     public jsondb = new JsonDB(new Config('runtime/arbitrationDB', true, false, '/'));
-    public configdb = new JsonDB(new Config('runtime/config', true, false, '/'));
-    public config: {
-        privateKey?: string, secretKey?: string, rpc?: string, makerApiEndpoint?: string, subgraphEndpoint?: string, makerList?: string[], gasLimit?: string, maxFeePerGas?: string, maxPriorityFeePerGas?: string
-    } = {};
-
-    constructor() {
-        this.initConfig();
-    }
-
-    async initConfig() {
-        try {
-            const config = await this.configdb.getData('/local') || {};
-            this.config = config;
-            if (config.encryptPrivateKey) {
-                this.config.privateKey = aesDecrypt(config.encryptPrivateKey, config.secretKey || '');
-            }
-        } catch (e) {
-        }
-    }
 
     async querySubgraph(query: string) {
-        const subgraphEndpoint = this.config.subgraphEndpoint;
+        const subgraphEndpoint = arbitrationConfig.subgraphEndpoint;
         if (!subgraphEndpoint) {
             throw new Error('SubgraphEndpoint not found');
         }
@@ -300,7 +282,7 @@ export class ArbitrationService {
 
     async getEBCValue(owner: string, ebcAddress: string, ruleId: string, sourceChain: string, destChain: string, amount: string) {
         const provider = new providers.JsonRpcProvider({
-            url: this.config.rpc,
+            url: arbitrationConfig.rpc,
         });
         const contractInstance = new ethers.Contract(
             ebcAddress,
@@ -355,10 +337,10 @@ export class ArbitrationService {
 
     async getGasPrice(transactionRequest: any) {
         const provider = new providers.JsonRpcProvider({
-            url: this.config.rpc,
+            url: arbitrationConfig.rpc,
         });
-        if (this.config.gasLimit) {
-            transactionRequest.gasLimit = ethers.BigNumber.from(this.config.gasLimit);
+        if (arbitrationConfig.gasLimit) {
+            transactionRequest.gasLimit = ethers.BigNumber.from(arbitrationConfig.gasLimit);
         } else {
             transactionRequest.gasLimit = ethers.BigNumber.from(500000);
         }
@@ -374,10 +356,10 @@ export class ArbitrationService {
         //     logger.error('get gas limit error:', e);
         // }
 
-        if (this.config.maxFeePerGas && this.config.maxPriorityFeePerGas) {
+        if (arbitrationConfig.maxFeePerGas && arbitrationConfig.maxPriorityFeePerGas) {
             transactionRequest.type = 2;
-            transactionRequest.maxFeePerGas = ethers.BigNumber.from(this.config.maxFeePerGas);
-            transactionRequest.maxPriorityFeePerGas = ethers.BigNumber.from(this.config.maxPriorityFeePerGas);
+            transactionRequest.maxFeePerGas = ethers.BigNumber.from(arbitrationConfig.maxFeePerGas);
+            transactionRequest.maxPriorityFeePerGas = ethers.BigNumber.from(arbitrationConfig.maxPriorityFeePerGas);
         } else {
             try {
                 const feeData = await provider.getFeeData();
@@ -408,12 +390,12 @@ export class ArbitrationService {
     }
 
     async getWallet() {
-        const arbitrationPrivateKey = this.config.privateKey;
+        const arbitrationPrivateKey = arbitrationConfig.privateKey;
         if (!arbitrationPrivateKey) {
             throw new Error('arbitrationPrivateKey not config');
         }
         const provider = new providers.JsonRpcProvider({
-            url: this.config.rpc,
+            url: arbitrationConfig.rpc,
         });
         return new ethers.Wallet(arbitrationPrivateKey).connect(provider);
     }
@@ -432,7 +414,7 @@ export class ArbitrationService {
         };
 
         const provider = new providers.JsonRpcProvider({
-            url: this.config.rpc,
+            url: arbitrationConfig.rpc,
         });
         await this.getGasPrice(transactionRequest);
         logger.debug(`transactionRequest: ${JSON.stringify(transactionRequest)}`);

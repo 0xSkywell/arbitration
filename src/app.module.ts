@@ -5,7 +5,6 @@ import { AppService } from './app.service';
 import { ArbitrationModule } from './arbitration/arbitration.module';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
-import { ArbitrationService } from './arbitration/arbitration.service';
 
 @Module({
     imports: [
@@ -14,7 +13,7 @@ import { ArbitrationService } from './arbitration/arbitration.service';
         ScheduleModule.forRoot(),
     ],
     controllers: [AppController],
-    providers: [AppService, ArbitrationService],
+    providers: [AppService],
 })
 export class AppModule {
 }
