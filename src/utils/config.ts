@@ -2,7 +2,9 @@ import { Config, JsonDB } from 'node-json-db';
 import { aesDecrypt } from './index';
 
 export let arbitrationConfig: {
-    privateKey?: string, secretKey?: string, rpc?: string, makerApiEndpoint?: string, subgraphEndpoint?: string, makerList?: string[], gasLimit?: string, maxFeePerGas?: string, maxPriorityFeePerGas?: string
+    privateKey?: string, secretKey?: string, rpc?: string, debug?: number,
+    makerApiEndpoint?: string, subgraphEndpoint?: string, makerList?: string[],
+    gasLimit?: string, maxFeePerGas?: string, maxPriorityFeePerGas?: string
 } = {};
 
 export const configdb = new JsonDB(new Config('runtime/config', true, false, '/'));

@@ -7,7 +7,7 @@ import { arbitrationConfig, configdb } from './utils/config';
 @Injectable()
 export class AppService {
     async setConfig(configParams: any) {
-        const { privateKey, secretKey, rpc, makerApiEndpoint, makerList, gasLimit, maxFeePerGas, maxPriorityFeePerGas } = configParams;
+        const { privateKey, secretKey, rpc, debug, makerApiEndpoint, makerList, gasLimit, maxFeePerGas, maxPriorityFeePerGas } = configParams;
         if (rpc) {
             try {
                 const provider = new providers.JsonRpcProvider({
@@ -49,6 +49,9 @@ export class AppService {
         }
         if (maxPriorityFeePerGas) {
             arbitrationConfig.maxPriorityFeePerGas = maxPriorityFeePerGas;
+        }
+        if (debug) {
+            arbitrationConfig.debug = debug;
         }
         if (makerApiEndpoint) {
             arbitrationConfig.makerApiEndpoint = makerApiEndpoint;

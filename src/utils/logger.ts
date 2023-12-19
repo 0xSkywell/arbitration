@@ -28,7 +28,8 @@ const logLevels: any = {
 
 import 'winston-daily-rotate-file';
 import moment from 'moment';
-import * as path from 'path'; // Add DailyRotateFile to Winston transports
+import * as path from 'path';
+import { arbitrationConfig } from './config'; // Add DailyRotateFile to Winston transports
 export interface LoggerOptions {
     key?: string;
     dir?: string;
@@ -131,7 +132,7 @@ export default {
         logger.error(message);
     },
     debug(...msg) {
-        if (!process.env['Debug']) return;
+        if (!arbitrationConfig.debug) return;
         const message = msg.join(' ');
         console.log(`${getFormatDate()} [DEBUG] \x1B[34m%s\x1b[39m`, message);
         logger.info(message);
