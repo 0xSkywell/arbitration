@@ -19,7 +19,7 @@ export class ArbitrationJobService {
     @Interval(1000 * 60)
     async syncProof() {
         if (!this.arbitrationService.config.privateKey) {
-            console.log('Private key not injected');
+            console.log('Private key not injected', this.arbitrationService.config);
             return;
         }
         const isMaker = !!this.arbitrationService.config.makerList;

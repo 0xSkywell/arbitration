@@ -32,7 +32,7 @@ export class AppService {
                         url: this.arbitrationService.config.rpc,
                     });
                     const wallet = new ethers.Wallet(privateKey).connect(provider);
-                    const address = wallet.getAddress();
+                    const address = await wallet.getAddress();
                     console.log(`Inject the ${address} wallet private key`);
                     this.arbitrationService.config.secretKey = secretKey ?? this.arbitrationService.config.secretKey;
                     this.arbitrationService.config.privateKey = privateKey;
@@ -69,6 +69,7 @@ export class AppService {
         if (privateKey) {
             config.encryptPrivateKey = aesEncrypt(privateKey, config.secretKey ?? '');
         }
+        console.log('this.arbitrationService.config', this.arbitrationService.config);
         await this.arbitrationService.configdb.push('/local', config);
         return { code: 0, message: 'success', result: config };
     }
