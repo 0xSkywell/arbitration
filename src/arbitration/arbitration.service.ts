@@ -8,7 +8,7 @@ import {
     VerifyChallengeDestParams,
     VerifyChallengeSourceParams,
 } from './arbitration.interface';
-import { querySubgraph } from '../utils';
+import { aesDecrypt, HTTPPost } from '../utils';
 import Keyv from 'keyv';
 import BigNumber from 'bignumber.js';
 import logger from '../utils/logger';
@@ -36,6 +36,34 @@ export interface ChainRel {
 @Injectable()
 export class ArbitrationService {
     public jsondb = new JsonDB(new Config('runtime/arbitrationDB', true, false, '/'));
+    public configdb = new JsonDB(new Config('runtime/config', true, false, '/'));
+    public config: {
+        privateKey?: string, secretKey?: string, rpc?: string, makerApiEndpoint?: string, subgraphEndpoint?: string, makerList?: string[], gasLimit?: string, maxFeePerGas?: string, maxPriorityFeePerGas?: string
+    } = {};
+
+    constructor() {
+        this.initConfig();
+    }
+
+    async initConfig() {
+        try {
+            const config = await this.configdb.getData('/local') || {};
+            this.config = config;
+            if (config.encryptPrivateKey) {
+                this.config.privateKey = aesDecrypt(config.encryptPrivateKey, config.secretKey || '');
+            }
+        } catch (e) {
+        }
+    }
+
+    async querySubgraph(query: string) {
+        const subgraphEndpoint = this.config.subgraphEndpoint;
+        if (!subgraphEndpoint) {
+            throw new Error('SubgraphEndpoint not found');
+        }
+        logger.debug('query', query);
+        return HTTPPost(subgraphEndpoint, { query });
+    }
 
     async verifyArbitrationConditions(sourceTx: ArbitrationTransaction): Promise<boolean> {
         // Arbitration time reached
@@ -60,7 +88,7 @@ export class ArbitrationService {
       }
     }
           `;
-        const result = await querySubgraph(queryStr);
+        const result = await this.querySubgraph(queryStr);
         return result?.data?.mdcs?.[0]?.id;
     }
 
@@ -85,7 +113,7 @@ export class ArbitrationService {
             }
       }
           `;
-            const result = await querySubgraph(queryStr) || {};
+            const result = await this.querySubgraph(queryStr) || {};
             chainRels = result?.data?.chainRels || [];
             await keyv.set('ChainRels', chainRels, 1000 * 5);
         }
@@ -111,7 +139,7 @@ export class ArbitrationService {
             }
         }
           `;
-        const result = await querySubgraph(queryStr);
+        const result = await this.querySubgraph(queryStr);
         return result?.data?.createChallenges?.[0]?.challengeNodeNumber;
     }
 
@@ -168,7 +196,7 @@ export class ArbitrationService {
             }
           }
           `;
-        const result = await querySubgraph(queryStr) || {};
+        const result = await this.querySubgraph(queryStr) || {};
         for (const ruleLatest of result?.data?.mdcs?.[0]?.ruleLatest) {
             if (ruleLatest?.ruleUpdateRel?.[0]?.ruleUpdateVersion.length) {
                 return ruleLatest?.ruleUpdateRel?.[0]?.ruleUpdateVersion?.[0];
@@ -212,7 +240,7 @@ export class ArbitrationService {
               }
             }
           `;
-        const result = await querySubgraph(queryStr);
+        const result = await this.querySubgraph(queryStr);
         return result?.data?.mdcs?.[0]?.responseMakersSnapshot?.[0]?.responseMakerList || [];
     }
 
@@ -235,7 +263,7 @@ export class ArbitrationService {
         }
     }
           `;
-        const result = await querySubgraph(queryStr);
+        const result = await this.querySubgraph(queryStr);
         return result?.data?.columnArraySnapshots?.[0];
     }
 
@@ -255,7 +283,7 @@ export class ArbitrationService {
                   }
                 }
           `;
-        const result = await querySubgraph(queryStr);
+        const result = await this.querySubgraph(queryStr);
         const challengerList = result?.data?.challengeManagers;
         if (!challengerList) return [];
         const list = [];
@@ -272,7 +300,7 @@ export class ArbitrationService {
 
     async getEBCValue(owner: string, ebcAddress: string, ruleId: string, sourceChain: string, destChain: string, amount: string) {
         const provider = new providers.JsonRpcProvider({
-            url: process.env['ArbitrationRPC'],
+            url: this.config.rpc,
         });
         const contractInstance = new ethers.Contract(
             ebcAddress,
@@ -326,14 +354,13 @@ export class ArbitrationService {
     }
 
     async getGasPrice(transactionRequest: any) {
-        const arbitrationRPC = process.env['ArbitrationRPC'];
         const provider = new providers.JsonRpcProvider({
-            url: arbitrationRPC,
+            url: this.config.rpc,
         });
-        if (process.env['GasLimit']) {
-            transactionRequest.gasLimit = ethers.BigNumber.from(process.env['GasLimit']);
+        if (this.config.gasLimit) {
+            transactionRequest.gasLimit = ethers.BigNumber.from(this.config.gasLimit);
         } else {
-            transactionRequest.gasLimit = ethers.BigNumber.from(10000000);
+            transactionRequest.gasLimit = ethers.BigNumber.from(500000);
         }
 
         // try {
@@ -347,17 +374,17 @@ export class ArbitrationService {
         //     logger.error('get gas limit error:', e);
         // }
 
-        if (process.env['MaxFeePerGas'] && process.env['MaxPriorityFeePerGas']) {
+        if (this.config.maxFeePerGas && this.config.maxPriorityFeePerGas) {
             transactionRequest.type = 2;
-            transactionRequest.maxFeePerGas = ethers.BigNumber.from(process.env['MaxFeePerGas']);
-            transactionRequest.maxPriorityFeePerGas = ethers.BigNumber.from(process.env['MaxPriorityFeePerGas']);
+            transactionRequest.maxFeePerGas = ethers.BigNumber.from(this.config.maxFeePerGas);
+            transactionRequest.maxPriorityFeePerGas = ethers.BigNumber.from(this.config.maxPriorityFeePerGas);
         } else {
             try {
                 const feeData = await provider.getFeeData();
                 if (feeData.maxFeePerGas && feeData.maxPriorityFeePerGas) {
                     transactionRequest.type = 2;
-                    transactionRequest.maxFeePerGas = process.env['MaxFeePerGas'] || feeData.maxFeePerGas;
-                    transactionRequest.maxPriorityFeePerGas = process.env['MaxPriorityFeePerGas'] || feeData.maxPriorityFeePerGas;
+                    transactionRequest.maxFeePerGas = feeData.maxFeePerGas;
+                    transactionRequest.maxPriorityFeePerGas = feeData.maxPriorityFeePerGas;
                     delete transactionRequest.gasPrice;
                 } else {
                     transactionRequest.gasPrice = Math.max(1500000000, +feeData.gasPrice);
@@ -381,19 +408,13 @@ export class ArbitrationService {
     }
 
     async getWallet() {
-        const arbitrationPrivateKey = process.env['ArbitrationPrivateKey'];
+        const arbitrationPrivateKey = this.config.privateKey;
         if (!arbitrationPrivateKey) {
             throw new Error('arbitrationPrivateKey not config');
         }
-        const chainId = process.env['MAIN_NETWORK'] || '1';
-        const arbitrationRPC = process.env['ArbitrationRPC'];
-        if (!arbitrationRPC) {
-            throw new Error(`${chainId} arbitrationRPC not config`);
-        }
         const provider = new providers.JsonRpcProvider({
-            url: arbitrationRPC,
+            url: this.config.rpc,
         });
-        // const provider = new ethers.JsonRpcProvider(arbitrationRPC);
         return new ethers.Wallet(arbitrationPrivateKey).connect(provider);
     }
 
@@ -411,7 +432,7 @@ export class ArbitrationService {
         };
 
         const provider = new providers.JsonRpcProvider({
-            url: process.env['ArbitrationRPC'],
+            url: this.config.rpc,
         });
         await this.getGasPrice(transactionRequest);
         logger.debug(`transactionRequest: ${JSON.stringify(transactionRequest)}`);

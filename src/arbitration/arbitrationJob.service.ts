@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { Cron, Interval } from '@nestjs/schedule';
 import { Mutex } from 'async-mutex';
 import { ArbitrationService } from './arbitration.service';
@@ -18,7 +18,11 @@ export class ArbitrationJobService {
 
     @Interval(1000 * 60)
     async syncProof() {
-        const isMaker = !!process.env['MakerList'];
+        if (!this.arbitrationService.config.privateKey) {
+            console.log('Private key not injected');
+            return;
+        }
+        const isMaker = !!this.arbitrationService.config.makerList;
         if (proofMutex.isLocked()) {
             return;
         }
@@ -27,7 +31,7 @@ export class ArbitrationJobService {
                 const arbitrationObj = await this.arbitrationService.getJSONDBData(`/arbitrationHash`);
                 for (const hash in arbitrationObj) {
                     if (arbitrationObj[hash] && !arbitrationObj[hash].isNeedProof) continue;
-                    const url = `${process.env['ArbitrationHost']}/proof/${isMaker ? 'verifyChallengeDestParams' : 'verifyChallengeSourceParams'}/${hash}`;
+                    const url = `${this.arbitrationService.config.makerApiEndpoint}/proof/${isMaker ? 'verifyChallengeDestParams' : 'verifyChallengeSourceParams'}/${hash}`;
                     const result: any = await HTTPGet(url);
                     logger.debug(`curl === ${url}`);
                     const proofDataList: any[] = result?.data;
@@ -46,6 +50,7 @@ export class ArbitrationJobService {
                         } else {
                             await this.arbitrationService.userSubmitProof(proofData);
                         }
+                        await new Promise(resolve => setTimeout(resolve, 3000));
                     }
                 }
             } catch (e) {
@@ -58,17 +63,19 @@ export class ArbitrationJobService {
         name: 'userArbitrationJob',
     })
     getListOfUnrefundedTransactions() {
-        if (process.env['MakerList']) {
+        if (!this.arbitrationService.config.privateKey) {
             return;
         }
-        logger.debug('exec userArbitrationJob');
+        if (this.arbitrationService.config.makerList) {
+            return;
+        }
         if (mutex.isLocked()) {
             return;
         }
         mutex.runExclusive(async () => {
             try {
                 const endTime = new Date().valueOf();
-                const url = `${process.env['ArbitrationHost']}/transaction/unreimbursedTransactions?startTime=${startTime - 1000 * 60 * 60}&endTime=${endTime}`;
+                const url = `${this.arbitrationService.config.makerApiEndpoint}/transaction/unreimbursedTransactions?startTime=${startTime - 1000 * 60 * 60}&endTime=${endTime}`;
                 const res: any = await HTTPGet(url);
                 logger.debug('curl', url);
                 if (res?.data) {
@@ -88,7 +95,7 @@ export class ArbitrationJobService {
                             } catch (error) {
                                 logger.error('Arbitration encountered an exception', error);
                             }
-
+                            await new Promise(resolve => setTimeout(resolve, 3000));
                         }
                     }
                     startTime = endTime;
@@ -103,11 +110,13 @@ export class ArbitrationJobService {
         name: 'makerArbitrationJob',
     })
     getListOfUnresponsiveTransactions() {
-        if (!process.env['MakerList']) {
+        if (!this.arbitrationService.config.privateKey) {
             return;
         }
-        const makerList = process.env['MakerList'].split(',');
-        logger.debug('exec makerArbitrationJob');
+        if (!this.arbitrationService.config.makerList) {
+            return;
+        }
+        const makerList = this.arbitrationService.config.makerList;
         if (mutex.isLocked()) {
             return;
         }
@@ -127,9 +136,10 @@ export class ArbitrationJobService {
                             challenger: challengerData.verifyPassChallenger,
                         });
                         logger.info(`maker ask proof ${hash}`);
-                        await HTTPPost(`${process.env['ArbitrationHost']}/proof/makerAskProof`, {
+                        await HTTPPost(`${this.arbitrationService.config.makerApiEndpoint}/proof/makerAskProof`, {
                             hash,
                         });
+                        await new Promise(resolve => setTimeout(resolve, 3000));
                     }
                 }
             } catch (e) {

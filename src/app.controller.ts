@@ -1,12 +1,21 @@
-import { Controller, Get } from '@nestjs/common';
+import { Body, Controller, Get, Post } from '@nestjs/common';
 import { AppService } from './app.service';
 
 @Controller()
 export class AppController {
-  constructor(private readonly appService: AppService) {}
+    constructor(private readonly appService: AppService) {
+    }
 
-  @Get()
-  getData() {
-    return this.appService.getData();
-  }
+    @Get()
+    index() {
+        return { code: 0, message: 'Welcome to the arbitration system' };
+    }
+
+    @Post('/config')
+    setConfig(@Body() data: any) {
+        if (!data) {
+            return { code: 1, message: 'Invalid parameters' };
+        }
+        return this.appService.setConfig(data);
+    }
 }
