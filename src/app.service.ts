@@ -1,8 +1,12 @@
 import { Injectable } from '@nestjs/common';
+import { ArbitrationService } from './arbitration/arbitration.service';
 
 @Injectable()
 export class AppService {
-  getData(): { message: string } {
-    return { message: 'Hello API' };
-  }
+    constructor(private arbitrationService: ArbitrationService) {
+    }
+
+    async getData() {
+        return await this.arbitrationService.jsondb.getData('/arbitrationHash');
+    }
 }
