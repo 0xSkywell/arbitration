@@ -51,7 +51,7 @@ export class AppService {
             arbitrationConfig.maxPriorityFeePerGas = maxPriorityFeePerGas;
         }
         if (debug) {
-            arbitrationConfig.debug = debug;
+            arbitrationConfig.debug = +debug;
         }
         if (makerApiEndpoint) {
             arbitrationConfig.makerApiEndpoint = makerApiEndpoint;
