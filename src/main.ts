@@ -15,6 +15,7 @@ async function bootstrap() {
         "privateKey": "",
         "secretKey": "Arbitrary string for encrypting the private key",
         "rpc": "https://ethereum-sepolia.publicnode.com",
+        "debug": 1,
         "makerApiEndpoint": "http://ec2-54-178-128-164.ap-northeast-1.compute.amazonaws.com:9003/maker-openapi",
         "gasLimit": "",
         "maxFeePerGas": "",
