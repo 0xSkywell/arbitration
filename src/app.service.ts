@@ -66,7 +66,6 @@ export class AppService {
         if (privateKey) {
             config.encryptPrivateKey = aesEncrypt(privateKey, config.secretKey ?? '');
         }
-        console.log('arbitrationConfig', arbitrationConfig);
         await configdb.push('/local', config);
         return { code: 0, message: 'success', result: config };
     }
