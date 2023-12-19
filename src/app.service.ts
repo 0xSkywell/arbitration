@@ -53,11 +53,11 @@ export class AppService {
         if (makerApiEndpoint) {
             arbitrationConfig.makerApiEndpoint = makerApiEndpoint;
             try {
-                const arbitrationConfig = await HTTPGet(`${makerApiEndpoint}/config/arbitration-client`);
-                if (arbitrationConfig?.data?.subgraphEndpoint) {
-                    arbitrationConfig.subgraphEndpoint = arbitrationConfig.data.subgraphEndpoint;
+                const arbitrationClientConfig = await HTTPGet(`${makerApiEndpoint}/config/arbitration-client`);
+                if (arbitrationClientConfig?.data?.subgraphEndpoint) {
+                    arbitrationConfig.subgraphEndpoint = arbitrationClientConfig.data.subgraphEndpoint;
                 } else {
-                    logger.error(`request fail: ${makerApiEndpoint}/config/arbitration-client`, arbitrationConfig);
+                    logger.error(`request fail: ${makerApiEndpoint}/config/arbitration-client`, arbitrationClientConfig);
                 }
             } catch (e) {
                 logger.error(`request fail: ${makerApiEndpoint}/config/arbitration-client`, e);
