@@ -34,6 +34,7 @@ export class ArbitrationJobService {
                     if (arbitrationObj[hash] && !arbitrationObj[hash].isNeedProof) continue;
                     const url = `${arbitrationConfig.makerApiEndpoint}/proof/${isMaker ? 'verifyChallengeDestParams' : 'verifyChallengeSourceParams'}/${hash}`;
                     const result: any = await HTTPGet(url);
+                    logger.input(`syncProof === ${url}`);
                     const proofDataList: any[] = result?.data;
                     if (!proofDataList.length) continue;
                     const proofData = proofDataList.find(item => item.status);
@@ -80,6 +81,7 @@ export class ArbitrationJobService {
                 const endTime = new Date().valueOf();
                 const url = `${arbitrationConfig.makerApiEndpoint}/transaction/unreimbursedTransactions?startTime=${startTime - 1000 * 60 * 60}&endTime=${endTime}`;
                 const res: any = await HTTPGet(url);
+                logger.input(`userArbitrationJob === ${url}`);
                 if (res?.data) {
                     const list: ArbitrationTransaction[] = res.data;
                     for (const item of list) {
