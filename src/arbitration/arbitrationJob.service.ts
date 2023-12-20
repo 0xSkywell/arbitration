@@ -34,7 +34,7 @@ export class ArbitrationJobService {
                     if (arbitrationObj[hash] && !arbitrationObj[hash].isNeedProof) continue;
                     const url = `${arbitrationConfig.makerApiEndpoint}/proof/${isMaker ? 'verifyChallengeDestParams' : 'verifyChallengeSourceParams'}/${hash}`;
                     const result: any = await HTTPGet(url);
-                    logger.input(`syncProof === ${url}`);
+                    // logger.input(`syncProof === ${url}`);
                     const proofDataList: any[] = result?.data;
                     if (!proofDataList.length) continue;
                     const proofData = proofDataList.find(item => item.status);
@@ -81,7 +81,7 @@ export class ArbitrationJobService {
                 const endTime = new Date().valueOf();
                 const url = `${arbitrationConfig.makerApiEndpoint}/transaction/unreimbursedTransactions?startTime=${startTime - 1000 * 60 * 60}&endTime=${endTime}`;
                 const res: any = await HTTPGet(url);
-                logger.input(`userArbitrationJob === ${url}`);
+                // logger.input(`userArbitrationJob === ${url}`);
                 if (res?.data) {
                     const list: ArbitrationTransaction[] = res.data;
                     for (const item of list) {
@@ -139,9 +139,10 @@ export class ArbitrationJobService {
                             challenger: challengerData.verifyPassChallenger,
                         });
                         logger.info(`maker ask proof ${hash}`);
-                        await HTTPPost(`${arbitrationConfig.makerApiEndpoint}/proof/makerAskProof`, {
+                        const res = await HTTPPost(`${arbitrationConfig.makerApiEndpoint}/proof/makerAskProof`, {
                             hash,
                         });
+                        logger.info('maker request ask', res);
                         await new Promise(resolve => setTimeout(resolve, 3000));
                     }
                 }
