@@ -49,7 +49,10 @@ export class ArbitrationJobService {
                                 challenger: arbitrationObj[hash].challenger,
                             });
                         } else {
-                            await this.arbitrationService.userSubmitProof(proofData);
+                            await this.arbitrationService.userSubmitProof({
+                                ...proofData,
+                                challenger: arbitrationObj[hash].challenger,
+                            });
                         }
                         await new Promise(resolve => setTimeout(resolve, 3000));
                     }

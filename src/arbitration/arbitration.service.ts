@@ -459,9 +459,13 @@ export class ArbitrationService {
             tx.freezeToken === '0x0000000000000000000000000000000000000000' ?
             ethers.BigNumber.from(new BigNumber(tx.freezeAmount1).plus(tx.minChallengeDepositAmount || 0).toString()) :
             ethers.BigNumber.from(0);
+        const account = await this.getWallet();
+        const challenger = account.address;
+        logger.debug(`challenger: ${challenger}`);
         const response = await this.send(mdcAddress, sendValue, data);
         logger.debug(`handleUserArbitration tx: ${JSON.stringify(response)}`);
         await this.jsondb.push(`/arbitrationHash/${tx.sourceTxHash.toLowerCase()}`, {
+            challenger,
             fromChainId: tx.sourceChainId,
             submitSourceTxHash: response.hash,
             isNeedProof: 1
