@@ -17,6 +17,7 @@ export interface ArbitrationTransaction {
 
 export interface VerifyChallengeSourceParams {
     hash: string;
+    challenger: string;
     sourceTime: string;
     sourceMaker: string;
     ruleId: string;
@@ -24,6 +25,7 @@ export interface VerifyChallengeSourceParams {
     ebcAddress: string;
     sourceChain: string;
     proof: string;
+    submitSourceTxHash: string;
 }
 
 export interface VerifyChallengeDestParams {

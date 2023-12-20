@@ -527,7 +527,7 @@ export class ArbitrationService {
 
         const ifa = new ethers.utils.Interface(MDCAbi);
         const encodeData = [
-            wallet.address,
+            txData.challenger,
             txData.spvAddress,
             +txData.sourceChain,
             txData.proof,
@@ -539,6 +539,8 @@ export class ArbitrationService {
         const response = await this.send(mdcAddress, ethers.BigNumber.from(0), data);
         logger.debug(`UserSubmitProof tx: ${JSON.stringify(response)}`);
         await this.jsondb.push(`/arbitrationHash/${txData.hash}`, {
+            challenger: txData.challenger,
+            submitSourceTxHash: txData.submitSourceTxHash,
             verifyChallengeSourceHash: response.hash,
             isNeedProof: 0
         });

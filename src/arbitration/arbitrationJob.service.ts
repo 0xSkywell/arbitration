@@ -52,6 +52,7 @@ export class ArbitrationJobService {
                             await this.arbitrationService.userSubmitProof({
                                 ...proofData,
                                 challenger: arbitrationObj[hash].challenger,
+                                submitSourceTxHash: arbitrationObj[hash].submitSourceTxHash,
                             });
                         }
                         await new Promise(resolve => setTimeout(resolve, 3000));
