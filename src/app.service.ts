@@ -92,27 +92,31 @@ export class AppService {
         if (mutex.isLocked()) {
             return { code: 1, message: 'Transaction is being sent, please request later' };
         }
-        await mutex.runExclusive(async () => {
-            try {
-                if (arbitrationConfig.makerList instanceof Array) {
-                    for (const owner of arbitrationConfig.makerList) {
-                        const checkChallengeParamsList: CheckChallengeParams[] = await this.arbitrationService.getCheckChallengeParams(owner);
-                        if (checkChallengeParamsList) {
-                            const checkChallengeParams = checkChallengeParamsList.find(item => item.sourceTxHash.toLowerCase() === hash.toLowerCase());
-                            if (checkChallengeParams) {
-                                return {
-                                    code: 0,
-                                    result: await this.arbitrationService.checkChallenge(checkChallengeParams),
-                                };
+        const result = await new Promise(async (resolve) => {
+            await mutex.runExclusive(async () => {
+                try {
+                    if (arbitrationConfig.makerList instanceof Array) {
+                        for (const owner of arbitrationConfig.makerList) {
+                            const checkChallengeParamsList: CheckChallengeParams[] = await this.arbitrationService.getCheckChallengeParams(owner);
+                            if (checkChallengeParamsList) {
+                                const checkChallengeParams = checkChallengeParamsList.find(item => item.sourceTxHash.toLowerCase() === hash.toLowerCase());
+                                if (checkChallengeParams) {
+                                    resolve({
+                                        code: 0,
+                                        result: await this.arbitrationService.checkChallenge(checkChallengeParams),
+                                    });
+                                }
                             }
                         }
+                        resolve({ code: 1, message: 'Transaction is not in the pending liquidation list' });
                     }
-                    return { code: 1, message: 'Transaction is not in the pending liquidation list' };
+                } catch (e) {
+                    logger.error('liquidate error', e);
                 }
-            } catch (e) {
-                logger.error('liquidate error', e);
-            }
+                resolve({ code: 1, message: 'Send Failure' });
+            });
         });
-        return { code: 1, message: 'Send Failure' };
+        await mutex.release();
+        return result;
     }
 }
