@@ -442,7 +442,7 @@ export class ArbitrationService {
             );
             newChallengeNodeNumber += challengeNode.substr(challengeNode.length - 16, 16);
         }
-        console.log("newChallengeNodeNumber", newChallengeNodeNumber);
+        logger.debug("newChallengeNodeNumber", newChallengeNodeNumber);
         const parentNodeNumOfTargetNode = await this.getChallengeNodeNumber(tx.sourceMaker, mdcAddress, newChallengeNodeNumber);
         logger.debug('parentNodeNumOfTargetNode', parentNodeNumOfTargetNode);
         const ruleKey = await this.getRuleKey(tx.sourceMaker, tx.ebcAddress, tx.ruleId);
