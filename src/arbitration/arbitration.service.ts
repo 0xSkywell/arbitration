@@ -280,12 +280,18 @@ export class ArbitrationService {
         return list;
     }
 
-    async getCurrentChallengeHash(owner: string) {
+    async getCurrentChallengeHash(owner: string, sourceChainId: string) {
+        const chainRels = await this.getChainRels();
+        const chain = chainRels.find(c => +c.id === +sourceChainId);
+        if (!chain) {
+            return null;
+        }
         const queryStr = `
                 {
                   createChallenges(
                     where: {
-                      challengeManager_: {owner: "${owner.toLowerCase()}"}
+                      challengeManager_: {owner: "${owner.toLowerCase()}"},
+                      verifyChallengeSourceTimestamp_gt: "${Math.floor(new Date().valueOf() / 1000) - +chain.maxVerifyChallengeDestTxSecond}"
                     },orderBy: challengeNodeNumber, orderDirection: asc) {
                     sourceChainId
                     sourceTxBlockNum
@@ -514,7 +520,6 @@ export class ArbitrationService {
             return;
         }
         logger.info(`userSubmitProof begin ${txData.hash}`);
-        const wallet = await this.getWallet();
         const mdcAddress = await this.getMDCAddress(txData.sourceMaker);
         if (!mdcAddress) {
             logger.error(`nonce of mdcAddress, ${JSON.stringify(txData)}`);

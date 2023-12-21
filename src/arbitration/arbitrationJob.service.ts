@@ -29,30 +29,27 @@ export class ArbitrationJobService {
         }
         await proofMutex.runExclusive(async () => {
             try {
-                const currentSourceTxHashList: string[] = [];
-                if (isMaker && arbitrationConfig.makerList instanceof Array) {
-                    for (const owner of arbitrationConfig.makerList) {
-                        const hash = await this.arbitrationService.getCurrentChallengeHash(owner);
-                        if (hash) {
-                            currentSourceTxHashList.push(hash);
-                        }
-                    }
-                    if (currentSourceTxHashList.length) logger.debug(`The current verifiable Tx ${currentSourceTxHashList.join(', ')}`);
-                }
                 const arbitrationObj = await this.arbitrationService.getJSONDBData(`/arbitrationHash`);
                 for (const hash in arbitrationObj) {
                     if (arbitrationObj[hash] && !arbitrationObj[hash].isNeedProof) continue;
-                    if (isMaker) {
-                        const currentSourceTxHash = currentSourceTxHashList.find(item => item.toLowerCase() === String(hash).toLowerCase());
-                        if (!currentSourceTxHash) continue;
-                        logger.info(`createChallenges sourceTxHash ${currentSourceTxHash}`);
-                    }
                     const url = `${arbitrationConfig.makerApiEndpoint}/proof/${isMaker ? 'verifyChallengeDestParams' : 'verifyChallengeSourceParams'}/${hash}`;
                     const result: any = await HTTPGet(url);
                     // logger.input(`syncProof === ${url}`);
                     const proofDataList: any[] = result?.data;
                     if (!proofDataList.length) continue;
                     const proofData = proofDataList.find(item => item.status);
+                    if (isMaker && arbitrationConfig.makerList instanceof Array) {
+                        let isCheck = false;
+                        for (const owner of arbitrationConfig.makerList) {
+                            const sourceTxHash = await this.arbitrationService.getCurrentChallengeHash(owner, proofData.sourceChain);
+                            if (sourceTxHash) logger.debug(`The current verifiable ${proofData.sourceChain} Tx ${sourceTxHash}`);
+                            if (sourceTxHash.toLowerCase() === String(hash).toLowerCase()) {
+                                logger.info(`createChallenges sourceTxHash ${sourceTxHash}`);
+                                isCheck = true;
+                            }
+                        }
+                        if (!isCheck) continue;
+                    }
                     if (proofData) {
                         if (!proofData?.proof) {
                             continue;
