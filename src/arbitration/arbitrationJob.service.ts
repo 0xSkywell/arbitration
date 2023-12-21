@@ -37,6 +37,7 @@ export class ArbitrationJobService {
                             currentSourceTxHashList.push(hash);
                         }
                     }
+                    if (currentSourceTxHashList.length) logger.debug(`The current verifiable Tx ${currentSourceTxHashList.join(', ')}`);
                 }
                 const arbitrationObj = await this.arbitrationService.getJSONDBData(`/arbitrationHash`);
                 for (const hash in arbitrationObj) {
