@@ -430,10 +430,19 @@ export class ArbitrationService {
         logger.info(`handleUserArbitration begin ${tx.sourceTxHash}`);
         const ifa = new ethers.utils.Interface(MDCAbi);
         const mdcAddress = await this.getMDCAddress(tx.sourceMaker);
-        const newChallengeNodeNumber = utils.defaultAbiCoder.encode(
-            ['uint64', 'uint64', 'uint64', 'uint64'],
-            [+tx.sourceTxTime, +tx.sourceChainId, +tx.sourceTxBlockNum, +tx.sourceTxIndex],
-        );
+        // const newChallengeNodeNumber = utils.defaultAbiCoder.encode(
+        //     ['uint64', 'uint64', 'uint64', 'uint64'],
+        //     [+tx.sourceTxTime, +tx.sourceChainId, +tx.sourceTxBlockNum, +tx.sourceTxIndex],
+        // );
+        let newChallengeNodeNumber = '0x';
+        for (const item of [+tx.sourceTxTime, +tx.sourceChainId, +tx.sourceTxBlockNum, +tx.sourceTxIndex]) {
+            const challengeNode = utils.defaultAbiCoder.encode(
+                ['uint64'],
+                [item],
+            );
+            newChallengeNodeNumber += challengeNode.substr(challengeNode.length - 16, 16);
+        }
+        console.log("newChallengeNodeNumber", newChallengeNodeNumber);
         const parentNodeNumOfTargetNode = await this.getChallengeNodeNumber(tx.sourceMaker, mdcAddress, newChallengeNodeNumber);
         logger.debug('parentNodeNumOfTargetNode', parentNodeNumOfTargetNode);
         const ruleKey = await this.getRuleKey(tx.sourceMaker, tx.ebcAddress, tx.ruleId);
