@@ -314,11 +314,17 @@ export class ArbitrationService {
         return null;
     }
 
-    async getCheckChallengeParams(owner: string) {
+    async getCheckChallengeParams(owner: string, sourceChainId: string) {
+        const chainRels = await this.getChainRels();
+        const chain = chainRels.find(c => +c.id === +sourceChainId);
+        if (!chain) {
+            return false;
+        }
         const queryStr = `
                 {
                   createChallenges(
                     where: {
+                        createChallengeTimestamp_lt: ${Math.floor(new Date().valueOf() / 1000) - +chain.maxVerifyChallengeSourceTxSecond},
                         challengeManager_: {
                             owner: "${owner.toLowerCase()}"
                         }
@@ -329,6 +335,7 @@ export class ArbitrationService {
                     challengeId
                     freezeToken
                     challenger
+                    createChallengeTimestamp
                     challengeManager {
                       owner
                       challengeStatuses
@@ -343,7 +350,7 @@ export class ArbitrationService {
             return null;
         }
         for (const challenger of challengerList) {
-            if (challenger?.challengeManager?.challengeStatuses === 'LIQUIDATION') {
+            if (challenger?.challengeManager?.challengeStatuses === 'CREATE') {
                 return { ...challenger, mdcAddress: challenger.challengeManager.mdcAddr };
             }
         }
