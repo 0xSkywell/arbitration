@@ -40,12 +40,12 @@ export class ArbitrationJobService {
                 }
                 const arbitrationObj = await this.arbitrationService.getJSONDBData(`/arbitrationHash`);
                 for (const hash in arbitrationObj) {
+                    if (arbitrationObj[hash] && !arbitrationObj[hash].isNeedProof) continue;
                     if (isMaker) {
                         const currentSourceTxHash = currentSourceTxHashList.find(item => item.toLowerCase() === String(hash).toLowerCase());
                         if (!currentSourceTxHash) continue;
                         logger.info(`createChallenges sourceTxHash ${currentSourceTxHash}`);
                     }
-                    if (arbitrationObj[hash] && !arbitrationObj[hash].isNeedProof) continue;
                     const url = `${arbitrationConfig.makerApiEndpoint}/proof/${isMaker ? 'verifyChallengeDestParams' : 'verifyChallengeSourceParams'}/${hash}`;
                     const result: any = await HTTPGet(url);
                     // logger.input(`syncProof === ${url}`);
