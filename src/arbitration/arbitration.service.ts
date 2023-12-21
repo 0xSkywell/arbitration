@@ -280,19 +280,13 @@ export class ArbitrationService {
         return list;
     }
 
-    async getCurrentChallengeHash(owner: string, sourceChainId: string) {
-        const chainRels = await this.getChainRels();
-        const chain = chainRels.find(c => +c.id === +sourceChainId);
-        if (!chain) {
-            return null;
-        }
+    async getCurrentChallengeHash(owner: string) {
         const queryStr = `
                 {
                   createChallenges(
                     where: {
                         challengeManager_: {
                             owner: "${owner.toLowerCase()}"
-                            verifyChallengeSourceTimestamp_gt: ${Math.floor(new Date().valueOf() / 1000) - +chain.maxVerifyChallengeDestTxSecond}
                         }
                     },orderBy: challengeNodeNumber, orderDirection: asc) {
                     sourceChainId
@@ -302,6 +296,7 @@ export class ArbitrationService {
                     freezeToken
                     challengeManager {
                       owner
+                      challengeStatuses
                     }
                   }
                 }
@@ -311,7 +306,13 @@ export class ArbitrationService {
         if (!challengerList || !challengerList.length) {
             return null;
         }
-        return challengerList[0]?.sourceTxHash;
+        for (const challenger of challengerList) {
+            logger.debug('challenger?.challengeManager?.challengeStatuses', challenger?.challengeManager?.challengeStatuses);
+            if (challenger?.challengeManager?.challengeStatuses !== 'LIQUIDATION') {
+                return challenger.sourceTxHash;
+            }
+        }
+        return null;
     }
 
     async getEBCValue(owner: string, ebcAddress: string, ruleId: string, sourceChain: string, destChain: string, amount: string) {

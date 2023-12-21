@@ -41,7 +41,7 @@ export class ArbitrationJobService {
                     if (isMaker && arbitrationConfig.makerList instanceof Array) {
                         let isCheck = false;
                         for (const owner of arbitrationConfig.makerList) {
-                            const sourceTxHash = await this.arbitrationService.getCurrentChallengeHash(owner, proofData.sourceChain);
+                            const sourceTxHash = await this.arbitrationService.getCurrentChallengeHash(owner);
                             if (sourceTxHash) {
                                 logger.debug(`The current verifiable ${proofData.sourceChain} Tx ${sourceTxHash}`);
                             } else {
