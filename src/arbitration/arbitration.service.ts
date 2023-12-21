@@ -674,8 +674,10 @@ export class ArbitrationService {
             return;
         }
         const verifiedSourceTxData = {
-            minChallengeSecond: ethers.BigNumber.from(chain.minVerifyChallengeSourceTxSecond),
-            maxChallengeSecond: ethers.BigNumber.from(chain.maxVerifyChallengeSourceTxSecond),
+            // minChallengeSecond: ethers.BigNumber.from(chain.minVerifyChallengeSourceTxSecond), // TODO
+            // maxChallengeSecond: ethers.BigNumber.from(chain.maxVerifyChallengeSourceTxSecond),
+            minChallengeSecond: ethers.BigNumber.from(0),
+            maxChallengeSecond: ethers.BigNumber.from(604800),
             nonce: ethers.BigNumber.from(txData.sourceNonce),
             destChainId: ethers.BigNumber.from(txData.targetChain),
             from: ethers.BigNumber.from(txData.sourceAddress),
