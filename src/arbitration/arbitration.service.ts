@@ -355,7 +355,7 @@ export class ArbitrationService {
         }
         const list = [];
         for (const challenger of challengerList) {
-            if (challenger?.challengeManager?.challengeStatuses !== 'LIQUIDATION' && challenger?.challengeManager?.challengeStatuses !== 'VERIFY_DEST') {
+            if (challenger?.challengeManager?.challengeStatuses !== 'LIQUIDATION') {
                 list.push({ ...challenger, mdcAddress: challenger.challengeManager.mdcAddr });
             }
         }
