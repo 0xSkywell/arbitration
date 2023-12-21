@@ -280,6 +280,32 @@ export class ArbitrationService {
         return list;
     }
 
+    async getCurrentChallengeHash(owner: string) {
+        const queryStr = `
+                {
+                  createChallenges(
+                    where: {
+                      challengeManager_: {owner: "${owner.toLowerCase()}"}
+                    },orderBy: challengeNodeNumber, orderDirection: asc) {
+                    sourceChainId
+                    sourceTxBlockNum
+                    sourceTxHash
+                    challengeId
+                    freezeToken
+                    challengeManager {
+                      owner
+                    }
+                  }
+                }
+          `;
+        const result = await this.querySubgraph(queryStr);
+        const challengerList = result?.data?.createChallenges;
+        if (!challengerList || !challengerList.length) {
+            return null;
+        }
+        return challengerList[0]?.sourceTxHash;
+    }
+
     async getEBCValue(owner: string, ebcAddress: string, ruleId: string, sourceChain: string, destChain: string, amount: string) {
         const provider = new providers.JsonRpcProvider({
             url: arbitrationConfig.rpc,
@@ -599,18 +625,6 @@ export class ArbitrationService {
             responseMakersHash: ethers.BigNumber.from(responseMakersHash),
             responseTime: ethers.BigNumber.from(responseTime),
         };
-        logger.debug('verifiedSourceTxData', verifiedSourceTxData);
-        // const verifiedSourceTxData = [
-        //     ethers.BigNumber.from(chain.minVerifyChallengeSourceTxSecond),
-        //     ethers.BigNumber.from(chain.maxVerifyChallengeSourceTxSecond),
-        //     ethers.BigNumber.from(txData.sourceNonce),
-        //     ethers.BigNumber.from(txData.targetChain),
-        //     ethers.BigNumber.from(txData.sourceAddress),
-        //     ethers.BigNumber.from(txData.targetToken),
-        //     ethers.BigNumber.from(txData.targetAmount),
-        //     ethers.BigNumber.from(responseMakersHash),
-        //     ethers.BigNumber.from(responseTime),
-        // ];
         const encodeData = [
             txData.challenger,
             txData.spvAddress,

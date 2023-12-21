@@ -29,8 +29,22 @@ export class ArbitrationJobService {
         }
         await proofMutex.runExclusive(async () => {
             try {
+                const currentSourceTxHashList: string[] = [];
+                if (isMaker && arbitrationConfig.makerList instanceof Array) {
+                    for (const owner of arbitrationConfig.makerList) {
+                        const hash = await this.arbitrationService.getCurrentChallengeHash(owner);
+                        if (hash) {
+                            currentSourceTxHashList.push(hash);
+                        }
+                    }
+                }
                 const arbitrationObj = await this.arbitrationService.getJSONDBData(`/arbitrationHash`);
                 for (const hash in arbitrationObj) {
+                    if (isMaker) {
+                        const currentSourceTxHash = currentSourceTxHashList.find(item => item.toLowerCase() === String(hash).toLowerCase());
+                        if (!currentSourceTxHash) continue;
+                        logger.info(`createChallenges sourceTxHash ${currentSourceTxHash}`);
+                    }
                     if (arbitrationObj[hash] && !arbitrationObj[hash].isNeedProof) continue;
                     const url = `${arbitrationConfig.makerApiEndpoint}/proof/${isMaker ? 'verifyChallengeDestParams' : 'verifyChallengeSourceParams'}/${hash}`;
                     const result: any = await HTTPGet(url);
