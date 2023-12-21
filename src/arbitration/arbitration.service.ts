@@ -354,16 +354,17 @@ export class ArbitrationService {
             return null;
         }
         const arbitrationObj = await this.getJSONDBData(`/arbitrationHash`);
+        const list = [];
         for (const challenger of challengerList) {
             if (arbitrationObj[challenger.sourceTxHash]) {
-                logger.debug(`${challenger.sourceTxHash} pre-existing`)
+                logger.debug(`${challenger.sourceTxHash} pre-existing`);
                 continue;
             }
-            if (challenger?.challengeManager?.challengeStatuses === 'CREATE') {
-                return { ...challenger, mdcAddress: challenger.challengeManager.mdcAddr };
+            if (challenger?.challengeManager?.challengeStatuses !== 'LIQUIDATION') {
+                list.push({ ...challenger, mdcAddress: challenger.challengeManager.mdcAddr });
             }
         }
-        return null;
+        return list;
     }
 
     async getEBCValue(owner: string, ebcAddress: string, ruleId: string, sourceChain: string, destChain: string, amount: string) {

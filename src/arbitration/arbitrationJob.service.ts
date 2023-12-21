@@ -1,14 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { Cron, Interval } from '@nestjs/schedule';
-import { Mutex } from 'async-mutex';
 import { ArbitrationService } from './arbitration.service';
 import { ArbitrationTransaction } from './arbitration.interface';
 import { HTTPGet, HTTPPost } from '../utils';
 import logger from '../utils/logger';
-import { arbitrationConfig } from '../utils/config';
+import { arbitrationConfig, mutex } from '../utils/config';
 
-const mutex = new Mutex();
-const proofMutex = new Mutex();
 let startTime = new Date().valueOf();
 
 // arbitration-client
@@ -24,10 +21,10 @@ export class ArbitrationJobService {
             return;
         }
         const isMaker = !!arbitrationConfig.makerList;
-        if (proofMutex.isLocked()) {
+        if (mutex.isLocked()) {
             return;
         }
-        await proofMutex.runExclusive(async () => {
+        await mutex.runExclusive(async () => {
             try {
                 const arbitrationObj = await this.arbitrationService.getJSONDBData(`/arbitrationHash`);
                 for (const hash in arbitrationObj) {
@@ -75,34 +72,6 @@ export class ArbitrationJobService {
                 }
             } catch (e) {
                 logger.error('syncProof error', e);
-            }
-        });
-    }
-
-    @Interval(1000 * 60)
-    async liquidate() {
-        if (!arbitrationConfig.privateKey) {
-            console.log('Private key not injected', arbitrationConfig);
-            return;
-        }
-        const isMaker = !!arbitrationConfig.makerList;
-        if (!isMaker) return;
-        if (proofMutex.isLocked()) {
-            return;
-        }
-        await proofMutex.runExclusive(async () => {
-            try {
-                if (arbitrationConfig.makerList instanceof Array) {
-                    for (const owner of arbitrationConfig.makerList) {
-                        const checkChallengeParams = await this.arbitrationService.getCheckChallengeParams(owner);
-                        if (checkChallengeParams) {
-                            await this.arbitrationService.checkChallenge(checkChallengeParams);
-                            await new Promise(resolve => setTimeout(resolve, 3000));
-                        }
-                    }
-                }
-            } catch (e) {
-                logger.error('liquidate error', e);
             }
         });
     }
