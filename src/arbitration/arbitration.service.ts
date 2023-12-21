@@ -314,9 +314,13 @@ export class ArbitrationService {
         return null;
     }
 
-    async getCheckChallengeParams(owner: string, sourceChainId: string) {
+    async getCheckChallengeParams(owner: string) {
+        const provider = new providers.JsonRpcProvider({
+            url: arbitrationConfig.rpc,
+        });
+        const network = await provider.getNetwork();
         const chainRels = await this.getChainRels();
-        const chain = chainRels.find(c => +c.id === +sourceChainId);
+        const chain = chainRels.find(c => +c.id === +network.chainId);
         if (!chain) {
             return false;
         }
@@ -349,7 +353,11 @@ export class ArbitrationService {
         if (!challengerList || !challengerList.length) {
             return null;
         }
+        const arbitrationObj = await this.getJSONDBData(`/arbitrationHash`);
         for (const challenger of challengerList) {
+            if (arbitrationObj[challenger.sourceTxHash]) {
+                continue;
+            }
             if (challenger?.challengeManager?.challengeStatuses === 'CREATE') {
                 return { ...challenger, mdcAddress: challenger.challengeManager.mdcAddr };
             }
@@ -709,6 +717,11 @@ export class ArbitrationService {
         const data = ifa.encodeFunctionData('checkChallenge', encodeData);
         const response = await this.send(txData.mdcAddress, ethers.BigNumber.from(0), data);
         logger.debug(`CheckChallenge tx: ${JSON.stringify(response)}`);
+        await this.jsondb.push(`/arbitrationHash/${txData.sourceTxHash.toLowerCase()}`, {
+            challenger: txData.challenger,
+            checkChallengeHash: response.hash,
+            isNeedProof: 0
+        });
         return response as any;
     }
 }
