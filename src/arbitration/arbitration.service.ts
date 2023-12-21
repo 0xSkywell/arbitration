@@ -307,7 +307,7 @@ export class ArbitrationService {
             return null;
         }
         for (const challenger of challengerList) {
-            if (challenger?.challengeManager?.challengeStatuses !== 'LIQUIDATION') {
+            if (challenger?.challengeManager?.challengeStatuses !== 'LIQUIDATION' && challenger?.challengeManager?.challengeStatuses !== 'VERIFY_DEST') {
                 return challenger.sourceTxHash;
             }
         }
@@ -360,7 +360,7 @@ export class ArbitrationService {
                 logger.debug(`${challenger.sourceTxHash} pre-existing`);
                 continue;
             }
-            if (challenger?.challengeManager?.challengeStatuses !== 'LIQUIDATION') {
+            if (challenger?.challengeManager?.challengeStatuses !== 'LIQUIDATION' && challenger?.challengeManager?.challengeStatuses !== 'VERIFY_DEST') {
                 list.push({ ...challenger, mdcAddress: challenger.challengeManager.mdcAddr });
             }
         }
