@@ -17,7 +17,7 @@ export class ArbitrationJobService {
     constructor(private arbitrationService: ArbitrationService) {
     }
 
-    @Interval(1000 * 60)
+    @Interval(1000 * 40)
     async syncProof() {
         if (!arbitrationConfig.privateKey) {
             console.log('Private key not injected', arbitrationConfig);
@@ -42,7 +42,11 @@ export class ArbitrationJobService {
                         let isCheck = false;
                         for (const owner of arbitrationConfig.makerList) {
                             const sourceTxHash = await this.arbitrationService.getCurrentChallengeHash(owner, proofData.sourceChain);
-                            if (sourceTxHash) logger.debug(`The current verifiable ${proofData.sourceChain} Tx ${sourceTxHash}`);
+                            if (sourceTxHash) {
+                                logger.debug(`The current verifiable ${proofData.sourceChain} Tx ${sourceTxHash}`);
+                            } else {
+                                continue;
+                            }
                             if (sourceTxHash.toLowerCase() === String(hash).toLowerCase()) {
                                 logger.info(`createChallenges sourceTxHash ${sourceTxHash}`);
                                 isCheck = true;

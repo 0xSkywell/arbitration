@@ -290,8 +290,10 @@ export class ArbitrationService {
                 {
                   createChallenges(
                     where: {
-                      challengeManager_: {owner: "${owner.toLowerCase()}"},
-                      verifyChallengeSourceTimestamp_gt: "${Math.floor(new Date().valueOf() / 1000) - +chain.maxVerifyChallengeDestTxSecond}"
+                      challengeManager_: {
+                          owner: "${owner.toLowerCase()}",
+                          verifyChallengeSourceTimestamp_gt: "${Math.floor(new Date().valueOf() / 1000) - +chain.maxVerifyChallengeDestTxSecond}"
+                      }
                     },orderBy: challengeNodeNumber, orderDirection: asc) {
                     sourceChainId
                     sourceTxBlockNum
