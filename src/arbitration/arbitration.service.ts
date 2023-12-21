@@ -4,7 +4,7 @@ import { utils, providers, ethers } from 'ethers';
 import MDCAbi from '../abi/MDC.abi.json';
 import EBCAbi from '../abi/EBC.abi.json';
 import {
-    ArbitrationTransaction,
+    ArbitrationTransaction, CheckChallengeParams,
     VerifyChallengeDestParams,
     VerifyChallengeSourceParams,
 } from './arbitration.interface';
@@ -307,9 +307,44 @@ export class ArbitrationService {
             return null;
         }
         for (const challenger of challengerList) {
-            logger.debug('challenger?.challengeManager?.challengeStatuses', challenger?.challengeManager?.challengeStatuses);
             if (challenger?.challengeManager?.challengeStatuses !== 'LIQUIDATION') {
                 return challenger.sourceTxHash;
+            }
+        }
+        return null;
+    }
+
+    async getCheckChallengeParams(owner: string) {
+        const queryStr = `
+                {
+                  createChallenges(
+                    where: {
+                        challengeManager_: {
+                            owner: "${owner.toLowerCase()}"
+                        }
+                    },orderBy: challengeNodeNumber, orderDirection: asc) {
+                    sourceChainId
+                    sourceTxBlockNum
+                    sourceTxHash
+                    challengeId
+                    freezeToken
+                    challenger
+                    challengeManager {
+                      owner
+                      challengeStatuses
+                      mdcAddr
+                    }
+                  }
+                }
+          `;
+        const result = await this.querySubgraph(queryStr);
+        const challengerList = result?.data?.createChallenges;
+        if (!challengerList || !challengerList.length) {
+            return null;
+        }
+        for (const challenger of challengerList) {
+            if (challenger?.challengeManager?.challengeStatuses === 'LIQUIDATION') {
+                return { ...challenger, mdcAddress: challenger.challengeManager.mdcAddr };
             }
         }
         return null;
@@ -652,6 +687,21 @@ export class ArbitrationService {
             isNeedProof: 0
         });
         logger.info(`makerSubmitProof end sourceId: ${txData.sourceId} verifyChallengeDestHash: ${response.hash}`);
+        return response as any;
+    }
+
+    async checkChallenge(txData: CheckChallengeParams) {
+        logger.info(`CheckChallenge begin: ${JSON.stringify(txData)}`);
+        const encodeData = [
+            txData.sourceChainId,
+            txData.sourceTxHash,
+            [txData.challenger],
+        ];
+        logger.debug(`encodeData: ${JSON.stringify(encodeData)}`);
+        const ifa = new ethers.utils.Interface(MDCAbi);
+        const data = ifa.encodeFunctionData('checkChallenge', encodeData);
+        const response = await this.send(txData.mdcAddress, ethers.BigNumber.from(0), data);
+        logger.debug(`CheckChallenge tx: ${JSON.stringify(response)}`);
         return response as any;
     }
 }

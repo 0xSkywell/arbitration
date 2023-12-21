@@ -79,6 +79,34 @@ export class ArbitrationJobService {
         });
     }
 
+    @Interval(1000 * 60)
+    async liquidate() {
+        if (!arbitrationConfig.privateKey) {
+            console.log('Private key not injected', arbitrationConfig);
+            return;
+        }
+        const isMaker = !!arbitrationConfig.makerList;
+        if (!isMaker) return;
+        if (proofMutex.isLocked()) {
+            return;
+        }
+        await proofMutex.runExclusive(async () => {
+            try {
+                if (arbitrationConfig.makerList instanceof Array) {
+                    for (const owner of arbitrationConfig.makerList) {
+                        const checkChallengeParams = await this.arbitrationService.getCheckChallengeParams(owner);
+                        if (checkChallengeParams) {
+                            await this.arbitrationService.checkChallenge(checkChallengeParams);
+                            await new Promise(resolve => setTimeout(resolve, 3000));
+                        }
+                    }
+                }
+            } catch (e) {
+                logger.error('liquidate error', e);
+            }
+        });
+    }
+
     @Cron('*/30 * * * * *', {
         name: 'userArbitrationJob',
     })

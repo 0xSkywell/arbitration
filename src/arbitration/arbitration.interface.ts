@@ -45,3 +45,10 @@ export interface VerifyChallengeDestParams {
     sourceId: string;
     proof: string;
 }
+
+export interface CheckChallengeParams {
+    sourceChainId: string;
+    sourceTxHash: string;
+    challenger: string;
+    mdcAddress: string;
+}
