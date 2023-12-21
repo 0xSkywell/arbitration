@@ -353,13 +353,8 @@ export class ArbitrationService {
         if (!challengerList || !challengerList.length) {
             return null;
         }
-        const arbitrationObj = await this.getJSONDBData(`/arbitrationHash`);
         const list = [];
         for (const challenger of challengerList) {
-            if (arbitrationObj[challenger.sourceTxHash]) {
-                logger.debug(`${challenger.sourceTxHash} pre-existing`);
-                continue;
-            }
             if (challenger?.challengeManager?.challengeStatuses !== 'LIQUIDATION' && challenger?.challengeManager?.challengeStatuses !== 'VERIFY_DEST') {
                 list.push({ ...challenger, mdcAddress: challenger.challengeManager.mdcAddr });
             }
