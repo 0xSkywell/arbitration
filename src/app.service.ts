@@ -124,7 +124,7 @@ export class AppService {
         if (!hash) {
             return { code: 1, message: 'Invalid parameters' };
         }
-        const data = await this.arbitrationService.getJSONDBData(`/arbitrationHash/${hash}`);
+        const data = await this.arbitrationService.getJSONDBData(`/arbitrationHash/${hash.toLowerCase()}`);
         if (!data) {
             return {
                 code: 1,
