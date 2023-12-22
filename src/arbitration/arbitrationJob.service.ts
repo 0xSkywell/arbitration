@@ -26,33 +26,42 @@ export class ArbitrationJobService {
         }
         await mutex.runExclusive(async () => {
             try {
+                let verifySourceHashList: string[] = [];
+                if (isMaker && arbitrationConfig.makerList instanceof Array) {
+                    for (const owner of arbitrationConfig.makerList) {
+                        verifySourceHashList = await this.arbitrationService.getCurrentChallengeHash(owner);
+                        if (verifySourceHashList && verifySourceHashList.length) {
+                            logger.debug(`The current verifiable Tx ${verifySourceHashList.join(', ')}`);
+                        } else {
+                            logger.debug(`No verifiable Tx`);
+                            return;
+                        }
+                    }
+                }
                 const arbitrationObj = await this.arbitrationService.getJSONDBData(`/arbitrationHash`);
-                for (const hash in arbitrationObj) {
-                    if (arbitrationObj[hash] && !arbitrationObj[hash].isNeedProof) continue;
+                for (const key in arbitrationObj) {
+                    if (arbitrationObj[key] && !arbitrationObj[key].isNeedProof) continue;
+                    const hash = String(key).toLowerCase();
+                    if (isMaker) {
+                        const sourceTxHash = verifySourceHashList.find(item => item.toLowerCase() === String(hash).toLowerCase());
+                        if (sourceTxHash) {
+                            logger.debug(`createChallenges sourceTxHash ${sourceTxHash}`);
+                        } else {
+                            logger.debug(`${hash} is not in the verifiable list`);
+                            continue;
+                        }
+                    }
                     const url = `${arbitrationConfig.makerApiEndpoint}/proof/${isMaker ? 'verifyChallengeDestParams' : 'verifyChallengeSourceParams'}/${hash}`;
                     const result: any = await HTTPGet(url);
-                    // logger.input(`syncProof === ${url}`);
                     const proofDataList: any[] = result?.data;
-                    if (!proofDataList.length) continue;
-                    const proofData = proofDataList.find(item => item.status);
-                    if (isMaker && arbitrationConfig.makerList instanceof Array) {
-                        let isCheck = false;
-                        for (const owner of arbitrationConfig.makerList) {
-                            const sourceTxHash = await this.arbitrationService.getCurrentChallengeHash(owner);
-                            if (sourceTxHash) {
-                                logger.debug(`The current verifiable ${proofData.sourceChain} Tx ${sourceTxHash}`);
-                            } else {
-                                continue;
-                            }
-                            if (sourceTxHash.toLowerCase() === String(hash).toLowerCase()) {
-                                logger.info(`createChallenges sourceTxHash ${sourceTxHash}`);
-                                isCheck = true;
-                            }
-                        }
-                        if (!isCheck) continue;
+                    if (!proofDataList.length) {
+                        logger.debug(`The interface does not return a list of ${hash} proofs`);
+                        continue;
                     }
+                    const proofData = proofDataList.find(item => item.status);
                     if (proofData) {
                         if (!proofData?.proof) {
+                            logger.error(`No proof found ${hash}`);
                             continue;
                         }
                         if (isMaker) {
@@ -68,6 +77,8 @@ export class ArbitrationJobService {
                             });
                         }
                         await new Promise(resolve => setTimeout(resolve, 3000));
+                    } else {
+                        logger.debug(`No ${hash} available proof`);
                     }
                 }
             } catch (e) {
@@ -94,7 +105,6 @@ export class ArbitrationJobService {
                 const endTime = new Date().valueOf();
                 const url = `${arbitrationConfig.makerApiEndpoint}/transaction/unreimbursedTransactions?startTime=${startTime - 1000 * 60 * 60}&endTime=${endTime}`;
                 const res: any = await HTTPGet(url);
-                // logger.input(`userArbitrationJob === ${url}`);
                 if (res?.data) {
                     const list: ArbitrationTransaction[] = res.data;
                     for (const item of list) {
@@ -102,7 +112,7 @@ export class ArbitrationJobService {
                         if (result) {
                             const data = await this.arbitrationService.getJSONDBData(`/arbitrationHash/${item.sourceTxHash.toLowerCase()}`);
                             if (data) {
-                                logger.debug('tx exist', item.sourceTxHash.toLowerCase());
+                                logger.debug(`${item.sourceTxHash.toLowerCase()} exist`);
                                 continue;
                             }
                             await arbitrationJsonDb.push(`/arbitrationHash/${item.sourceTxHash.toLowerCase()}`, { isNeedProof: 0 });
@@ -144,14 +154,14 @@ export class ArbitrationJobService {
                         const hash = challengerData.sourceTxHash.toLowerCase();
                         const data = await this.arbitrationService.getJSONDBData(`/arbitrationHash/${hash}`);
                         if (data) {
-                            logger.debug('tx exist', hash);
+                            logger.debug(`${hash} tx exist`);
                             continue;
                         }
                         const txStatusRes = await HTTPGet(`${arbitrationConfig.makerApiEndpoint}/transaction/status/${hash}`, {
                             hash,
                         });
                         if (txStatusRes?.data !== 99) {
-                            console.log('txStatusRes', txStatusRes);
+                            logger.debug(`${hash} status ${txStatusRes?.data}`);
                             continue;
                         }
                         const res = await HTTPPost(`${arbitrationConfig.makerApiEndpoint}/proof/makerAskProof`, {

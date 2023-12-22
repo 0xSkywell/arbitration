@@ -41,7 +41,7 @@ export class ArbitrationService {
         if (!subgraphEndpoint) {
             throw new Error('SubgraphEndpoint not found');
         }
-        logger.debug('query', query);
+        logger.debug('query', query.replace(/\ +/g,"").replace(/[\r\n]/g," "));
         return HTTPPost(subgraphEndpoint, { query });
     }
 
@@ -304,12 +304,13 @@ export class ArbitrationService {
         if (!challengerList || !challengerList.length) {
             return null;
         }
+        const txHashList = [];
         for (const challenger of challengerList) {
-            if (challenger?.challengeManager?.challengeStatuses !== 'LIQUIDATION' && challenger?.challengeManager?.challengeStatuses !== 'VERIFY_DEST') {
-                return challenger.sourceTxHash;
+            if (challenger?.challengeManager?.challengeStatuses === 'VERIFY_SOURCE') {
+                txHashList.push(challenger.sourceTxHash);
             }
         }
-        return null;
+        return txHashList;
     }
 
     async getCheckChallengeParams(owner: string) {
@@ -520,6 +521,7 @@ export class ArbitrationService {
             logger.error(`none of ruleKey, owner: ${tx.sourceMaker} ebcAddress: ${tx.ebcAddress} ruleId: ${tx.ruleId}`);
             return;
         }
+        const freezeAmount = new BigNumber(tx.freezeAmount1).multipliedBy(2).toFixed(0);
         // Obtaining arbitration deposit
         const encodeData = [
             +tx.sourceTxTime,
@@ -529,14 +531,14 @@ export class ArbitrationService {
             tx.sourceTxHash,
             ruleKey,
             tx.freezeToken,
-            ethers.BigNumber.from(tx.freezeAmount1).toNumber(),
+            ethers.BigNumber.from(freezeAmount).toNumber(),
             ethers.BigNumber.from(parentNodeNumOfTargetNode || 0),
         ];
         logger.debug(`encodeData: ${JSON.stringify(encodeData)}`);
         const data = ifa.encodeFunctionData('challenge', encodeData);
         const sendValue =
             tx.freezeToken === '0x0000000000000000000000000000000000000000' ?
-            ethers.BigNumber.from(new BigNumber(tx.freezeAmount1).plus(tx.minChallengeDepositAmount || 0).toString()) :
+            ethers.BigNumber.from(new BigNumber(freezeAmount).plus(tx.minChallengeDepositAmount || 0).toString()) :
             ethers.BigNumber.from(0);
         const account = await this.getWallet();
         const challenger = account.address;
@@ -658,10 +660,10 @@ export class ArbitrationService {
             return;
         }
         const verifiedSourceTxData = {
-            // minChallengeSecond: ethers.BigNumber.from(chain.minVerifyChallengeSourceTxSecond), // TODO
-            // maxChallengeSecond: ethers.BigNumber.from(chain.maxVerifyChallengeSourceTxSecond),
-            minChallengeSecond: ethers.BigNumber.from(0),
-            maxChallengeSecond: ethers.BigNumber.from(604800),
+            minChallengeSecond: ethers.BigNumber.from(chain.minVerifyChallengeSourceTxSecond),
+            maxChallengeSecond: ethers.BigNumber.from(chain.maxVerifyChallengeSourceTxSecond),
+            // minChallengeSecond: ethers.BigNumber.from(0),
+            // maxChallengeSecond: ethers.BigNumber.from(604800),
             nonce: ethers.BigNumber.from(txData.sourceNonce),
             destChainId: ethers.BigNumber.from(txData.targetChain),
             from: ethers.BigNumber.from(txData.sourceAddress),
