@@ -21,7 +21,7 @@ export class AppController {
 
     @Post('/liquidate')
     liquidate(@Body() data: any) {
-        if (!data) {
+        if (!data?.hash) {
             return { code: 1, message: 'Invalid parameters' };
         }
         return this.appService.liquidate(data.hash);
@@ -29,7 +29,7 @@ export class AppController {
 
     @Post('/retry_proof')
     retryProof(@Body() data: any) {
-        if (!data.hash) {
+        if (!data?.hash) {
             return { code: 1, message: 'Invalid parameters' };
         }
         return this.appService.retryProof(data.hash);
