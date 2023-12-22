@@ -119,4 +119,20 @@ export class AppService {
         await mutex.release();
         return result;
     }
+
+    async retryProof(hash: string) {
+        if (!hash) {
+            return { code: 1, message: 'Invalid parameters' };
+        }
+        const data = await this.arbitrationService.getJSONDBData(`/arbitrationHash/${hash}`);
+        if (!data) {
+            return {
+                code: 1,
+                message: `Please check if the transaction(${hash}) exists under runtime/attritionDB.json`,
+            };
+        }
+        data.isNeedProof = 1;
+        await this.arbitrationService.jsondb.push(`/arbitrationHash/${hash}`, data);
+        return { code: 0, message: 'success', result: data };
+    }
 }

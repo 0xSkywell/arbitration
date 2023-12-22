@@ -26,4 +26,12 @@ export class AppController {
         }
         return this.appService.liquidate(data.hash);
     }
+
+    @Post('/retry_proof')
+    retryProof(@Body() data: any) {
+        if (!data.hash) {
+            return { code: 1, message: 'Invalid parameters' };
+        }
+        return this.appService.retryProof(data.hash);
+    }
 }
