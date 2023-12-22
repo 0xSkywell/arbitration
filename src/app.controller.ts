@@ -21,7 +21,7 @@ export class AppController {
 
     @Post('/liquidate')
     liquidate(@Body() data: any) {
-        if (!data.hash) {
+        if (!data) {
             return { code: 1, message: 'Invalid parameters' };
         }
         return this.appService.liquidate(data.hash);
