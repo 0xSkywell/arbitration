@@ -313,20 +313,10 @@ export class ArbitrationService {
     }
 
     async getCheckChallengeParams(owner: string) {
-        // const provider = new providers.JsonRpcProvider({
-        //     url: arbitrationConfig.rpc,
-        // });
-        // const network = await provider.getNetwork();
-        // const chainRels = await this.getChainRels();
-        // const chain = chainRels.find(c => +c.id === +network.chainId);
-        // if (!chain) {
-        //     return false;
-        // }
         const queryStr = `
                 {
                   createChallenges(
                     where: {
-                        createChallengeTimestamp_lt: ${Math.floor(new Date().valueOf() / 1000) - 172800},
                         challengeManager_: {
                             owner: "${owner.toLowerCase()}"
                         }
