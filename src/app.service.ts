@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ethers, providers } from 'ethers';
 import { aesEncrypt, HTTPGet } from './utils';
 import logger from './utils/logger';
-import { arbitrationConfig, configdb, mutex } from './utils/config';
+import { arbitrationConfig, arbitrationJsonDb, configdb, mutex } from './utils/config';
 import { ArbitrationService } from './arbitration/arbitration.service';
 import { CheckChallengeParams } from './arbitration/arbitration.interface';
 
@@ -132,7 +132,7 @@ export class AppService {
             };
         }
         data.isNeedProof = 1;
-        await this.arbitrationService.jsondb.push(`/arbitrationHash/${hash}`, data);
+        await arbitrationJsonDb.push(`/arbitrationHash/${hash.toLowerCase()}`, data);
         return { code: 0, message: 'success', result: data };
     }
 }

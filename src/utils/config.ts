@@ -10,6 +10,8 @@ export let arbitrationConfig: {
 
 export const configdb = new JsonDB(new Config('runtime/config', true, false, '/'));
 
+export const arbitrationJsonDb = new JsonDB(new Config('runtime/arbitrationDB', true, false, '/'));
+
 export const mutex = new Mutex();
 
 async function initConfig() {

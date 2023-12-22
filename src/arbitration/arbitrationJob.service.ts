@@ -4,7 +4,7 @@ import { ArbitrationService } from './arbitration.service';
 import { ArbitrationTransaction } from './arbitration.interface';
 import { HTTPGet, HTTPPost } from '../utils';
 import logger from '../utils/logger';
-import { arbitrationConfig, mutex } from '../utils/config';
+import { arbitrationConfig, arbitrationJsonDb, mutex } from '../utils/config';
 
 let startTime = new Date().valueOf();
 
@@ -105,7 +105,7 @@ export class ArbitrationJobService {
                                 logger.debug('tx exist', item.sourceTxHash.toLowerCase());
                                 continue;
                             }
-                            await this.arbitrationService.jsondb.push(`/arbitrationHash/${item.sourceTxHash.toLowerCase()}`, { isNeedProof: 0 });
+                            await arbitrationJsonDb.push(`/arbitrationHash/${item.sourceTxHash.toLowerCase()}`, { isNeedProof: 0 });
                             try {
                                 await this.arbitrationService.handleUserArbitration(item);
                             } catch (error) {
@@ -158,7 +158,7 @@ export class ArbitrationJobService {
                             hash,
                         });
                         logger.info('maker request ask', JSON.stringify(res));
-                        await this.arbitrationService.jsondb.push(`/arbitrationHash/${hash}`, {
+                        await arbitrationJsonDb.push(`/arbitrationHash/${hash}`, {
                             isNeedProof: 1,
                             challenger: challengerData.verifyPassChallenger,
                         });

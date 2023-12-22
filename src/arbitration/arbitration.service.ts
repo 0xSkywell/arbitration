@@ -13,7 +13,7 @@ import Keyv from 'keyv';
 import BigNumber from 'bignumber.js';
 import logger from '../utils/logger';
 import { keccak256 } from "@ethersproject/keccak256";
-import { arbitrationConfig } from '../utils/config';
+import { arbitrationConfig, arbitrationJsonDb } from '../utils/config';
 
 let accountNonce = 0;
 
@@ -36,8 +36,6 @@ export interface ChainRel {
 
 @Injectable()
 export class ArbitrationService {
-    public jsondb = new JsonDB(new Config('runtime/arbitrationDB', true, false, '/'));
-
     async querySubgraph(query: string) {
         const subgraphEndpoint = arbitrationConfig.subgraphEndpoint;
         if (!subgraphEndpoint) {
@@ -411,7 +409,7 @@ export class ArbitrationService {
 
     async getJSONDBData(dataPath) {
         try {
-            return await this.jsondb.getData(dataPath);
+            return await arbitrationJsonDb.getData(dataPath);
         } catch (e) {
             return null;
         }
@@ -555,7 +553,7 @@ export class ArbitrationService {
         logger.debug(`challenger: ${challenger}`);
         const response = await this.send(mdcAddress, sendValue, data);
         logger.debug(`handleUserArbitration tx: ${JSON.stringify(response)}`);
-        await this.jsondb.push(`/arbitrationHash/${tx.sourceTxHash.toLowerCase()}`, {
+        await arbitrationJsonDb.push(`/arbitrationHash/${tx.sourceTxHash.toLowerCase()}`, {
             challenger,
             fromChainId: tx.sourceChainId,
             submitSourceTxHash: response.hash,
@@ -628,7 +626,7 @@ export class ArbitrationService {
         const data = ifa.encodeFunctionData('verifyChallengeSource', encodeData);
         const response = await this.send(mdcAddress, ethers.BigNumber.from(0), data);
         logger.debug(`UserSubmitProof tx: ${JSON.stringify(response)}`);
-        await this.jsondb.push(`/arbitrationHash/${txData.hash}`, {
+        await arbitrationJsonDb.push(`/arbitrationHash/${txData.hash}`, {
             challenger: txData.challenger,
             submitSourceTxHash: txData.submitSourceTxHash,
             verifyChallengeSourceHash: response.hash,
@@ -695,7 +693,7 @@ export class ArbitrationService {
         const data = ifa.encodeFunctionData('verifyChallengeDest', encodeData);
         const response = await this.send(mdcAddress, ethers.BigNumber.from(0), data);
         logger.debug(`MakerSubmitProof tx: ${JSON.stringify(response)}`);
-        await this.jsondb.push(`/arbitrationHash/${txData.sourceId}`, {
+        await arbitrationJsonDb.push(`/arbitrationHash/${txData.sourceId}`, {
             verifyChallengeDestHash: response.hash,
             challenger: txData.challenger,
             isNeedProof: 0
@@ -716,7 +714,7 @@ export class ArbitrationService {
         const data = ifa.encodeFunctionData('checkChallenge', encodeData);
         const response = await this.send(txData.mdcAddress, ethers.BigNumber.from(0), data);
         logger.debug(`CheckChallenge tx: ${JSON.stringify(response)}`);
-        await this.jsondb.push(`/arbitrationHash/${txData.sourceTxHash.toLowerCase()}`, {
+        await arbitrationJsonDb.push(`/arbitrationHash/${txData.sourceTxHash.toLowerCase()}`, {
             challenger: txData.challenger,
             checkChallengeHash: response.hash,
             isNeedProof: 0
