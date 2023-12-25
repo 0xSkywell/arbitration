@@ -177,11 +177,26 @@ export class ArbitrationService {
           }
           `;
         const result = await this.querySubgraph(queryStr) || {};
-        for (const ruleLatest of result?.data?.mdcs?.[0]?.ruleLatest) {
-            if (ruleLatest?.ruleUpdateRel?.[0]?.ruleUpdateVersion.length) {
-                return ruleLatest?.ruleUpdateRel?.[0]?.ruleUpdateVersion?.[0];
+        if (result?.data?.mdcs) {
+            for (const mdc of result?.data?.mdcs) {
+                const ruleUpdateRels = mdc?.ruleLatest?.ruleUpdateRel;
+                if (ruleUpdateRels) {
+                    for (const ruleUpdateRel of ruleUpdateRels) {
+                        const ruleUpdateVersions = ruleUpdateRel?.ruleUpdateVersion;
+                        if (ruleUpdateVersions) {
+                            for (const ruleUpdateVersion of ruleUpdateVersions) {
+                                return ruleUpdateVersion;
+                            }
+                        }
+                    }
+                }
             }
         }
+        // for (const ruleLatest of result?.data?.mdcs?.[0]?.ruleLatest) {
+        //     if (ruleLatest?.ruleUpdateRel?.[0]?.ruleUpdateVersion.length) {
+        //         return ruleLatest?.ruleUpdateRel?.[0]?.ruleUpdateVersion?.[0];
+        //     }
+        // }
         return null;
     }
 
@@ -221,7 +236,22 @@ export class ArbitrationService {
             }
           `;
         const result = await this.querySubgraph(queryStr);
-        return result?.data?.mdcs?.[0]?.responseMakersSnapshot?.[0]?.responseMakerList || [];
+        const mdcs = result?.data?.mdcs;
+        if (mdcs) {
+            for(const mdc of mdcs){
+                const responseMakersSnapshots = mdc?.responseMakersSnapshot;
+                if(responseMakersSnapshots){
+                    for(const responseMakersSnapshot of responseMakersSnapshots){
+                        const responseMakerList = responseMakersSnapshot?.responseMakerList;
+                        if(responseMakerList && responseMakerList.length){
+                            return responseMakerList;
+                        }
+                    }
+                }
+            }
+        }
+        return [];
+        // return result?.data?.mdcs?.[0]?.responseMakersSnapshot?.[0]?.responseMakerList || [];
     }
 
     async getColumnArray(txTimestamp: string | number, mdcAddress: string, owner: string) {
@@ -244,7 +274,14 @@ export class ArbitrationService {
     }
           `;
         const result = await this.querySubgraph(queryStr);
-        return result?.data?.columnArraySnapshots?.[0];
+        const columnArraySnapshots = result?.data?.columnArraySnapshots;
+        for (const columnArraySnapshot of columnArraySnapshots) {
+            if (columnArraySnapshot) {
+                return columnArraySnapshot;
+            }
+        }
+        return null;
+        // return result?.data?.columnArraySnapshots?.[0];
     }
 
     async getVerifyPassChallenger(owner: string) {
