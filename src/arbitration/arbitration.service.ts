@@ -455,7 +455,7 @@ export class ArbitrationService {
         if (arbitrationConfig.gasLimit) {
             transactionRequest.gasLimit = ethers.BigNumber.from(arbitrationConfig.gasLimit);
         } else {
-            transactionRequest.gasLimit = ethers.BigNumber.from(500000);
+            transactionRequest.gasLimit = ethers.BigNumber.from(1000000);
         }
 
         // try {

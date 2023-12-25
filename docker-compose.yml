@@ -7,17 +7,6 @@ services:
     build: .
     container_name: arbitration-client
     restart: always
-    environment:
-      MAIN_NETWORK: '${MAIN_NETWORK}'
-      ArbitrationRPC: '${ArbitrationRPC}'
-      SubgraphEndpoint: '${SubgraphEndpoint}'
-      ArbitrationHost: '${ArbitrationHost}'
-      ArbitrationPrivateKey: '${ArbitrationPrivateKey}'
-      MakerList: '${MakerList}'
-      Debug: '${Debug}'
-      GasLimit: '${GasLimit}'
-      MaxFeePerGas: '${MaxFeePerGas}'
-      MaxPriorityFeePerGas: '${MaxPriorityFeePerGas}'
     ports:
       - '3000:3000'
     networks:
