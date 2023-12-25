@@ -643,6 +643,7 @@ export class ArbitrationService {
             rule.chain0CompensationRatio,
             rule.chain1CompensationRatio,
         ];
+        logger.debug(`formatRule: ${JSON.stringify(formatRule)}`);
         const rlpRuleBytes = utils.RLP.encode(
             formatRule.map((r) => utils.stripZeros(ethers.BigNumber.from(r).toHexString())),
         );
