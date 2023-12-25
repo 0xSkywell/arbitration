@@ -107,6 +107,7 @@ export class ArbitrationJobService {
                 const res: any = await HTTPGet(url);
                 if (res?.data) {
                     const list: ArbitrationTransaction[] = res.data;
+                    logger.debug(`${url} unreimbursedTransactions count ${list.length}`);
                     for (const item of list) {
                         const result = await this.arbitrationService.verifyArbitrationConditions(item);
                         if (result) {
@@ -122,6 +123,8 @@ export class ArbitrationJobService {
                                 logger.error('Arbitration encountered an exception', item, error);
                             }
                             await new Promise(resolve => setTimeout(resolve, 3000));
+                        } else {
+                            logger.debug(`verifyArbitrationConditions fail ${JSON.stringify(item)}`);
                         }
                     }
                     startTime = endTime;
