@@ -179,16 +179,22 @@ export class ArbitrationService {
         const result = await this.querySubgraph(queryStr) || {};
         if (result?.data?.mdcs) {
             for (const mdc of result?.data?.mdcs) {
-                const ruleUpdateRels = mdc?.ruleLatest?.ruleUpdateRel;
-                console.log('ruleUpdateRels', ruleUpdateRels);
-                if (ruleUpdateRels) {
-                    for (const ruleUpdateRel of ruleUpdateRels) {
-                        const ruleUpdateVersions = ruleUpdateRel?.ruleUpdateVersion;
-                        console.log('ruleUpdateVersions', ruleUpdateVersions);
-                        if (ruleUpdateVersions) {
-                            for (const ruleUpdateVersion of ruleUpdateVersions) {
-                                console.log('ruleUpdateVersion', ruleUpdateVersion);
-                                return ruleUpdateVersion;
+                const ruleLatests = mdc?.ruleLatest;
+                console.log('ruleLatests', ruleLatests);
+                if (ruleLatests) {
+                    for (const ruleLatest of ruleLatests) {
+                        const ruleUpdateRels = ruleLatest?.ruleUpdateRel;
+                        console.log('ruleUpdateRels', ruleUpdateRels);
+                        if (ruleUpdateRels) {
+                            for (const ruleUpdateRel of ruleUpdateRels) {
+                                const ruleUpdateVersions = ruleUpdateRel?.ruleUpdateVersion;
+                                console.log('ruleUpdateVersions', ruleUpdateVersions);
+                                if (ruleUpdateVersions) {
+                                    for (const ruleUpdateVersion of ruleUpdateVersions) {
+                                        console.log('ruleUpdateVersion', ruleUpdateVersion);
+                                        return ruleUpdateVersion;
+                                    }
+                                }
                             }
                         }
                     }
